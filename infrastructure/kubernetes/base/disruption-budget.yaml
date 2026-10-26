@@ -1,0 +1,19 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: quickbuddy-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickbuddy-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: quickbuddy-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickbuddy-worker

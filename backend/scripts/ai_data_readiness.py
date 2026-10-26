@@ -22,13 +22,11 @@ async def inspect(database_url, expected):
     statements = {
         "orders_total": "SELECT count(*) FROM commerce.orders",
         "orders_last_28d": (
-            "SELECT count(*) FROM commerce.orders "
-            "WHERE created_at >= now()-interval '28 days'"
+            "SELECT count(*) FROM commerce.orders WHERE created_at >= now()-interval '28 days'"
         ),
         "merchant_orders_total": "SELECT count(*) FROM commerce.merchant_orders",
         "merchant_orders_ready_or_fulfilled": (
-            "SELECT count(*) FROM commerce.merchant_orders "
-            "WHERE status IN ('ready','fulfilled')"
+            "SELECT count(*) FROM commerce.merchant_orders WHERE status IN ('ready','fulfilled')"
         ),
         "completed_delivery_tasks": (
             "SELECT count(*) FROM fulfillment.delivery_tasks WHERE status='delivered'"

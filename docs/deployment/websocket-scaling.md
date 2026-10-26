@@ -1,0 +1,5 @@
+# WebSocket and GPS scaling
+
+Authenticate each subscription and use short-lived single-use tickets; authorize resources server-side. Redis pub/sub/fan-out lets multiple API instances receive transient updates; PostgreSQL remains authoritative. On disconnect/reconnect, fetch the current order/dispatch snapshot from the API then resume events. Sticky sessions are not a correctness requirement. Do not open a database connection per GPS packet. Coalesce location updates, enforce freshness/rate/connection quotas, and apply bounded outbound buffers/backpressure.
+
+Prometheus socket gauge is process-local and opt-in. It does not provide a fleet total unless scrape labels aggregate instances. Metrics endpoint must be network-restricted. Redis pub/sub can lose events during disconnect, so clients reconcile from authoritative snapshot. Session revocation and cross-instance delivery need a two-replica/restart integration test; none was run. Verify GPS ordering, stale location behavior, subscriber quotas and privacy retention before launch.

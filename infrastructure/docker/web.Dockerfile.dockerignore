@@ -1,0 +1,17 @@
+.git
+.venv
+.env
+.env.*
+.secrets
+.local
+node_modules
+**/node_modules
+**/.next
+**/build
+**/dist
+backend
+database
+docs
+tests
+tools
+Target UI

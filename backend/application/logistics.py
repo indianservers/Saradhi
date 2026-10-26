@@ -57,9 +57,7 @@ async def offer(session, actor, task_id, pilot_id, request_id):
     if current and current.expires_at <= now():
         current.status = "expired"
         task.status = "unassigned"
-        previous_pilot = await Repository(session).require(
-            m.Pilot, current.pilot_id, lock=True
-        )
+        previous_pilot = await Repository(session).require(m.Pilot, current.pilot_id, lock=True)
         await sync_pilot_capacity(session, previous_pilot)
         await session.flush()
     transition("delivery", task.status, "offered")

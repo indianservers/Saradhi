@@ -24,3 +24,9 @@ tools/openapi-generator-cli-*.jar
 .local/
 database/backups/*
 !database/backups/.gitkeep
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+.terraform/
+crash.log

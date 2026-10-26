@@ -7,6 +7,7 @@ import 'package:flutter_core/flutter_core.dart';
 import 'package:flutter_design_system/flutter_design_system.dart';
 import 'package:flutter_networking/flutter_networking.dart';
 import 'package:go_router/go_router.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 final tokenStore = SecureTokenStore();
 final transportProvider = Provider((ref) => createTransport(tokenStore));
@@ -531,21 +532,27 @@ class CheckoutScreen extends ConsumerStatefulWidget {
   @override ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
-  bool loading = true, submitting = false; String? error, cartId; Map<String, dynamic>? quote; List<Map<String, dynamic>> lines = [];
-  @override void initState() { super.initState(); _quote(); }
+  bool loading = true, submitting = false; String? error, cartId; Map<String, dynamic>? quote, paymentConfiguration, paymentIntent; List<Map<String, dynamic>> lines = [];
+  late final Razorpay razorpay;
+  @override void initState() { super.initState(); razorpay = Razorpay(); razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _paymentSuccess); razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _paymentFailure); razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _externalWallet); _quote(); }
+  @override void dispose() { razorpay.clear(); super.dispose(); }
   Future<void> _quote() async {
     try {
       if (!await _signedIn()) { if (mounted) setState(() { loading = false; error = 'Sign in before checkout.'; }); return; }
       cartId = cartIdStore.value ?? await tokenStore.readValue('qb_cart');
       if (cartId == null) throw Exception('Your cart is empty.');
       final r = await ref.read(transportProvider).post('/api/v1/carts/$cartId/quote');
-      if (mounted) setState(() { quote = Map<String, dynamic>.from(r.data); lines = _items({'items': r.data['lines']}); loading = false; error = null; });
+      Map<String, dynamic>? config;
+      try { config = Map<String, dynamic>.from((await ref.read(transportProvider).get('/api/v1/payments/configuration')).data); } catch (_) { config = null; }
+      if (mounted) setState(() { quote = Map<String, dynamic>.from(r.data); lines = _items({'items': r.data['lines']}); paymentConfiguration = config; loading = false; error = null; });
     } catch (e) { if (mounted) setState(() { loading = false; error = _message(e); }); }
   }
   Future<void> _confirm() async {
     final q = quote;
     if (q == null || submitting) return;
-    if (!sandboxEnabled) { _snack(context, 'A production payment provider is not configured. No order was placed.'); return; }
+    final sandboxAvailable = paymentConfiguration?['sandbox_payment_available'] == true;
+    final onlineEnabled = paymentConfiguration?['online_payment_available'] == true;
+    if (!sandboxAvailable && !onlineEnabled) { _snack(context, 'Online payment is currently unavailable.'); return; }
     setState(() => submitting = true);
     try {
       var key = await tokenStore.readValue('qb_idempotency_${q['id']}');
@@ -554,7 +561,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       final response = await ref.read(transportProvider).post('/api/v1/orders/confirm', data: {'quote_id': q['id']}, options: Options(headers: {'Idempotency-Key': key}));
       if (!mounted) return;
       final orderId = response.data['id'] as String;
-      if (sandboxEnabled) {
+      if (sandboxAvailable) {
         try {
           final api = ref.read(transportProvider);
           final intent = await api.post('/api/v1/finance/sandbox/payment-intents', data: {'order_id': orderId});
@@ -565,12 +572,41 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         } catch (e) {
           _snack(context, 'Order placed; sandbox payment did not complete: ${_message(e)}');
         }
-      } else {
-        _snack(context, 'Order placed. Production payment provider is not configured in this app.');
+      } else if (onlineEnabled) {
+        final api = ref.read(transportProvider);
+        final paymentKey = 'payment-$key-${DateTime.now().millisecondsSinceEpoch}';
+        final payment = await api.post('/api/v1/payments/intents', data: {'order_id': orderId}, options: Options(headers: {'Idempotency-Key': paymentKey}));
+        if (!mounted) return;
+        setState(() { pendingOrderId = orderId; paymentIntent = Map<String, dynamic>.from(payment.data); submitting = false; });
+        if (payment.data['status'] != 'pending') {
+          _snack(context, 'Payment status is ${payment.data['status']}. We will not start another charge.');
+          context.go('/orders/$orderId/complete');
+          return;
+        }
+        _openRazorpay(payment.data);
+        return;
       }
       context.go('/orders/$orderId/complete');
     } catch (e) { if (mounted) { setState(() => submitting = false); _snack(context, 'Order was not confirmed: ${_message(e)}. Retry safely with the same checkout.'); } }
   }
+  String? pendingOrderId;
+  void _openRazorpay(Map<String, dynamic> intent) {
+    razorpay.open({'key': intent['key_id'], 'amount': intent['amount_minor'], 'currency': intent['currency'], 'order_id': intent['provider_order_id'], 'name': 'Quickbuddy', 'description': 'Order payment', 'retry': {'enabled': true, 'max_count': 2}});
+  }
+  Future<void> _paymentSuccess(PaymentSuccessResponse response) async {
+    final providerOrderId = response.orderId ?? paymentIntent?['provider_order_id']?.toString();
+    final providerPaymentId = response.paymentId;
+    final signature = response.signature;
+    if (providerOrderId == null || providerPaymentId == null || signature == null) { _snack(context, 'Payment response is incomplete. Check payment status before retrying.'); return; }
+    try {
+      final result = await ref.read(transportProvider).post('/api/v1/payments/razorpay/verify', data: {'order_id': providerOrderId, 'payment_id': providerPaymentId, 'signature': signature});
+      if (!mounted) return;
+      if (result.data['status'] == 'confirmed') { context.go('/orders/${pendingOrderId!}/complete'); }
+      else { _snack(context, 'Payment status: ${result.data['status']}. We will confirm after provider verification.'); }
+    } catch (e) { if (mounted) _snack(context, 'Payment verification is pending. Check order status before retrying: ${_message(e)}'); }
+  }
+  void _paymentFailure(PaymentFailureResponse response) { if (mounted) _snack(context, 'Payment did not complete. Check order status before trying again.'); }
+  void _externalWallet(ExternalWalletResponse response) { if (mounted) _snack(context, 'External wallet selected: ${response.walletName ?? 'wallet'}'); }
   @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [
     const _PageHeader(title: 'Review your order', subtitle: 'Each merchant and delivery slot is confirmed separately'),
     if (loading) const Center(child: CircularProgressIndicator()) else if (error != null) _InfoCard(text: error!, action: TextButton(onPressed: _quote, child: const Text('Refresh quote'))) else if (quote != null) ...[
@@ -587,11 +623,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _PriceLine('Server quoted total', '${quote!['currency']} ${quote!['total']}', bold: true),
       Text('Quote expires ${quote!['expires_at']}', style: const TextStyle(color: QuickbuddyColors.muted, fontSize: 11)),
       const SizedBox(height: 8),
-      Card(child: ListTile(leading: const Icon(Icons.payment_outlined, color: QuickbuddyColors.violet), title: Text(sandboxEnabled ? 'Sandbox payment' : 'Payment unavailable'), subtitle: Text(sandboxEnabled ? 'Test simulation · no real money charged' : 'A production payment provider is not configured.'), trailing: Icon(sandboxEnabled ? Icons.check_circle : Icons.info_outline, color: QuickbuddyColors.violet))),
+      Card(child: ListTile(leading: const Icon(Icons.payment_outlined, color: QuickbuddyColors.violet), title: Text(paymentConfiguration?['sandbox_payment_available'] == true ? 'Sandbox payment' : paymentConfiguration?['online_payment_available'] == true ? 'Online payment · Razorpay' : 'Payment unavailable'), subtitle: Text(paymentConfiguration?['sandbox_payment_available'] == true ? 'Test simulation · no real money charged' : paymentConfiguration?['online_payment_available'] == true ? 'Secure checkout. Payment is confirmed by Quickbuddy.' : 'Online payment is currently unavailable.'), trailing: Icon(paymentConfiguration?['sandbox_payment_available'] == true || paymentConfiguration?['online_payment_available'] == true ? Icons.check_circle : Icons.info_outline, color: QuickbuddyColors.violet))),
       const SizedBox(height: 10),
       const QbPreviewNotice(message: 'Separate merchant windows may mean separate deliveries. Only the quoted total is charged; unavailable taxes, fees or discounts are not estimated.'),
       const SizedBox(height: 12),
-      QbPrimaryButton(label: submitting ? 'Confirming…' : sandboxEnabled ? 'Place sandbox order' : 'Payment unavailable', icon: Icons.lock_outline, enabled: !submitting && sandboxEnabled, onPressed: submitting || !sandboxEnabled ? null : _confirm),
+      QbPrimaryButton(label: submitting ? 'Confirming…' : paymentConfiguration?['sandbox_payment_available'] == true ? 'Place sandbox order' : paymentConfiguration?['online_payment_available'] == true ? 'Place order and pay' : 'Payment unavailable', icon: Icons.lock_outline, enabled: !submitting && (paymentConfiguration?['sandbox_payment_available'] == true || paymentConfiguration?['online_payment_available'] == true), onPressed: submitting || (paymentConfiguration?['sandbox_payment_available'] != true && paymentConfiguration?['online_payment_available'] != true) ? null : _confirm),
     ],
   ]);
   Map<String, List<Map<String, dynamic>>> _quoteGroups() {
@@ -721,6 +757,16 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     } catch (e) { if (mounted) _snack(context, 'Payment is still pending: ${_message(e)}'); }
     finally { if (mounted) setState(() => paymentBusy = false); }
   }
+  Future<void> _refreshPaymentStatus() async {
+    final current = payment;
+    if (current == null || paymentBusy) return;
+    setState(() => paymentBusy = true);
+    try {
+      final response = await ref.read(transportProvider).get('/api/v1/payments/${current['id']}');
+      if (mounted) { setState(() => payment = Map<String, dynamic>.from(response.data)); _snack(context, 'Verified payment status: ${response.data['status']}.'); }
+    } catch (e) { if (mounted) _snack(context, 'Payment status could not be refreshed: ${_message(e)}'); }
+    finally { if (mounted) setState(() => paymentBusy = false); }
+  }
   @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [
     const Icon(Icons.check_circle_outline, color: QuickbuddyColors.green, size: 58),
     const _PageHeader(title: 'Order received', subtitle: 'Order confirmation is loaded from Quickbuddy'),
@@ -728,10 +774,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       Text('Order ${widget.orderId}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
       const SizedBox(height: 5), Text('Status: ${order!['status']} · ${order!['currency']} ${order!['total']}', textAlign: TextAlign.center),
       const SizedBox(height: 12),
-      Card(child: ListTile(leading: Icon(payment?['status'] == 'confirmed' ? Icons.check_circle : Icons.pending_outlined, color: payment?['status'] == 'confirmed' ? QuickbuddyColors.green : QuickbuddyColors.amber), title: Text('Payment ${payment?['status'] ?? 'not started'}'), subtitle: Text(payment == null ? 'Use sandbox payment in development/test.' : 'Sandbox · ${payment!['currency']} ${payment!['amount']}'))),
-      if (sandboxEnabled && payment?['status'] != 'confirmed') OutlinedButton.icon(onPressed: paymentBusy ? null : _resumeSandboxPayment, icon: const Icon(Icons.refresh), label: Text(paymentBusy ? 'Resuming payment…' : 'Continue sandbox payment')),
+      Card(child: ListTile(leading: Icon(payment?['status'] == 'confirmed' ? Icons.check_circle : Icons.pending_outlined, color: payment?['status'] == 'confirmed' ? QuickbuddyColors.green : QuickbuddyColors.amber), title: Text('Payment ${payment?['status'] ?? 'not started'}'), subtitle: Text(payment == null ? 'No payment has been started.' : '${payment!['provider']} · ${payment!['currency']} ${payment!['amount']}'))),
+      if (payment != null && payment?['status'] != 'confirmed') OutlinedButton.icon(onPressed: paymentBusy ? null : payment?['provider'] == 'sandbox' ? _resumeSandboxPayment : _refreshPaymentStatus, icon: const Icon(Icons.refresh), label: Text(paymentBusy ? 'Checking…' : payment?['provider'] == 'sandbox' ? 'Continue sandbox payment' : 'Check payment status')),
       QbPrimaryButton(label: 'Track order', onPressed: () => context.push('/orders/${widget.orderId}/tracking')),
-      const QbPreviewNotice(message: 'Sandbox payment has no real-money effect. Customer reviews and reorder endpoints are not configured.'),
+      if (payment?['provider'] == 'sandbox') const QbPreviewNotice(message: 'Sandbox payment has no real-money effect. Customer reviews and reorder endpoints are not configured.'),
     ],
   ]);
 }

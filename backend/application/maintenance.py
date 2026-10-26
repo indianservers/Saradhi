@@ -33,7 +33,7 @@ async def expire_reservations(session, limit=100, reservation_id=None):
 
 async def materialize_occurrences(session, plan_id, instants):
     plan = await session.get(F["fulfillment.recurring_order_plans"], plan_id)
-    if not plan or not plan.active:
+    if not plan or not plan.active or plan.status != "active":
         raise BusinessError("inactive_plan", "Recurring plan is unavailable")
     model = F["fulfillment.scheduled_order_occurrences"]
     created = []
@@ -55,6 +55,11 @@ async def materialize_occurrences(session, plan_id, instants):
         )
         if row:
             created.append(row)
+            await session.execute(
+                insert(F["fulfillment.scheduling_job_records"])
+                .values(occurrence_id=row, attempts=0, available_at=now(), locked_until=None)
+                .on_conflict_do_nothing(index_elements=["occurrence_id"])
+            )
     # No payment agreement -> still persisted for review, never an automatic charge.
     return created
 
@@ -65,7 +70,7 @@ async def expand_recurrence(session, plan_id, start, end):
         for name in ["recurring_order_plans", "recurring_order_rules", "recurrence_exceptions"]
     )
     plan = await session.scalar(select(Plan).where(Plan.id == plan_id).with_for_update())
-    if not plan or not plan.active:
+    if not plan or not plan.active or plan.status != "active":
         raise BusinessError("inactive_plan", "Recurring plan is unavailable")
     rules = (await session.scalars(select(Rule).where(Rule.plan_id == plan.id))).all()
     exceptions = set(
@@ -93,6 +98,7 @@ async def expand_recurrence(session, plan_id, start, end):
                 exceptions,
             )
         )
+    instants = {instant for instant in instants if instant > now()}
     return await materialize_occurrences(session, plan.id, sorted(instants))
 
 

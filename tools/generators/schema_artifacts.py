@@ -139,9 +139,11 @@ def generate(freeze=False):
                 erd.append(f'  {source} ||--o{{ {destination} : "{fk.name}"')
         erd += ["```", ""]
     erd += [
-        "Each diagram groups child tables by namespace; external parents retain their schema prefix.",
+        "Each diagram groups child tables by namespace; external parents retain "
+        "their schema prefix.",
         "Columns and nullability are fully specified in the dictionary and machine schema.",
-        "Actual applied-migration/catalog evidence is in ../operations/phase-2-database-evidence.json.",
+        "Actual applied-migration/catalog evidence is in "
+        "../operations/phase-2-database-evidence.json.",
     ]
     md += [
         "## Database-only invariants",

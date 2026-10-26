@@ -1,1 +1,1 @@
-"""Vendor-neutral external system boundaries."""
+"""External service adapters."""

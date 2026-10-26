@@ -1665,6 +1665,12 @@ footer span {
   gap: 5px;
   min-width: 150px;
 }
+.qb-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
 .qb-incident-resolve input {
   width: 100%;
   min-width: 140px;

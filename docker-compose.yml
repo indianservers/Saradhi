@@ -4,6 +4,7 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     ports: ["127.0.0.1:6379:6379"]
     volumes: ["redis_data:/data"]
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -19,6 +20,13 @@ services:
       DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql+asyncpg://quickbuddy:REPLACE_ME@host.docker.internal:5432/quickbuddy_dev}
       REDIS_URL: redis://redis:6379/0
     ports: ["127.0.0.1:8000:8000"]
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    mem_limit: 2g
+    cpus: 2.0
     depends_on:
       redis:
         condition: service_healthy
@@ -31,6 +39,15 @@ services:
     env_file: .env
     environment:
       REDIS_URL: redis://redis:6379/0
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    mem_limit: 1g
+    cpus: 1.0
+    healthcheck:
+      disable: true
     depends_on:
       redis:
         condition: service_healthy

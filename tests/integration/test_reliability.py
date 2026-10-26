@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
 
-from backend.application import events, identity, logistics, maintenance
+from backend.application import events, identity, logistics, maintenance, recurring
 from backend.application.common import add, now
 from backend.integrations.maps.routing import FixtureRoutingProvider, RouteResult
 from backend.persistence import models as m
@@ -316,6 +316,203 @@ async def test_ai_forecast_is_explicitly_untrained_and_model_evaluation_is_data_
     assert copilot.status_code == 503
 
 
+async def test_role_scoped_ai_agents_use_live_evidence_and_deny_cross_scope(api):
+    client, app = api
+    state = await world(client, app, 1)
+    customer_result = await client.post(
+        "/api/v1/ai/agents/customer/query",
+        json={"question": "Find Integration product", "city_id": state["city"]["id"]},
+        headers=state["customer"]["headers"],
+    )
+    assert customer_result.status_code == 200, customer_result.text
+    customer_data = customer_result.json()
+    assert customer_data["provider"] == "deterministic"
+    assert customer_data["fallback"] is True
+    assert customer_data["evidence"]["data_source"] == "live_available_catalog"
+    assert customer_data["evidence"]["matched_count"] == 1
+    matched = customer_data["evidence"]["available_catalog_matches"][0]
+    assert matched["product"] == "Integration product"
+    assert matched["price"] == "10.0000"
+    assert matched["currency"] == "XTS"
+
+    denied_city = await client.post(
+        "/api/v1/ai/agents/city/query",
+        json={"question": "Summarize delayed deliveries", "city_id": state["city"]["id"]},
+        headers=state["customer"]["headers"],
+    )
+    assert denied_city.status_code == 403
+
+    missing_city = await client.post(
+        "/api/v1/ai/agents/customer/query",
+        json={"question": "Find biryani"},
+        headers=state["customer"]["headers"],
+    )
+    assert missing_city.status_code == 422
+
+    tampered_scope = await client.post(
+        "/api/v1/ai/agents/customer/query",
+        json={
+            "question": "Find biryani",
+            "city_id": state["city"]["id"],
+            "branch_id": state["shops"][0]["branch"]["id"],
+        },
+        headers=state["customer"]["headers"],
+    )
+    assert tampered_scope.status_code == 422
+
+    merchant_result = await client.post(
+        "/api/v1/ai/agents/merchant/query",
+        json={
+            "question": "What sold recently?",
+            "branch_id": state["shops"][0]["branch"]["id"],
+        },
+        headers=state["shops"][0]["merchant"]["headers"],
+    )
+    assert merchant_result.status_code == 200, merchant_result.text
+    assert merchant_result.json()["evidence"]["branch_id"] == state["shops"][0]["branch"]["id"]
+
+
+async def test_recurring_plan_owner_pause_skip_and_idempotent_materialization(api):
+    client, app = api
+    state = await world(client, app, 1)
+    customer = state["customer"]
+    shop = state["shops"][0]
+    cart = await post(client, "/carts", None, customer)
+    await post(
+        client,
+        f"/carts/{cart['id']}/items",
+        {
+            "branch_id": shop["branch"]["id"],
+            "variant_id": shop["variant"]["id"],
+            "quantity": "1",
+            "window_id": shop["window"]["id"],
+            "delivery_method": "pickup",
+        },
+        customer,
+    )
+    start = (now().date() + timedelta(days=1)).isoformat()
+    end = (now().date() + timedelta(days=6)).isoformat()
+    created = await client.post(
+        "/api/v1/fulfillment/recurring-plans",
+        json={
+            "cart_id": cart["id"],
+            "timezone": "UTC",
+            "frequency": "daily",
+            "interval": 1,
+            "local_time": "09:00:00",
+            "start_date": start,
+            "end_date": end,
+        },
+        headers=customer["headers"],
+    )
+    assert created.status_code == 201, created.text
+    plan_id = created.json()["id"]
+    assert created.json()["payment_authorized"] is False
+    assert created.json()["execution_policy"] == "review_required_no_automatic_charge_or_order"
+
+    outsider = await user(client, app)
+    denied = await client.get(
+        f"/api/v1/fulfillment/recurring-plans/{plan_id}/occurrences",
+        headers=outsider["headers"],
+    )
+    assert denied.status_code == 403
+
+    async with app.state.sessions.begin() as db:
+        first = await recurring.expand_active_plans(db)
+    async with app.state.sessions.begin() as db:
+        second = await recurring.expand_active_plans(db)
+    assert first["occurrences_created"] > 0
+    assert second["occurrences_created"] == 0
+    occurrence_list = await client.get(
+        f"/api/v1/fulfillment/recurring-plans/{plan_id}/occurrences",
+        headers=customer["headers"],
+    )
+    assert occurrence_list.status_code == 200
+    rows = occurrence_list.json()["items"]
+    assert rows and all(row["status"] == "awaiting_revalidation" for row in rows)
+    assert all(row["order_id"] is None for row in rows)
+
+    skipped = await client.post(
+        f"/api/v1/fulfillment/recurring-plans/{plan_id}/skip",
+        json={"local_date": start},
+        headers=customer["headers"],
+    )
+    assert skipped.status_code == 200, skipped.text
+    assert skipped.json()["occurrences_updated"] == 1
+    paused = await client.put(
+        f"/api/v1/fulfillment/recurring-plans/{plan_id}/status",
+        json={"status": "paused"},
+        headers=customer["headers"],
+    )
+    assert paused.status_code == 200
+    assert paused.json()["active"] is False
+    resumed = await client.put(
+        f"/api/v1/fulfillment/recurring-plans/{plan_id}/status",
+        json={"status": "active"},
+        headers=customer["headers"],
+    )
+    assert resumed.status_code == 200
+    cancelled = await client.put(
+        f"/api/v1/fulfillment/recurring-plans/{plan_id}/status",
+        json={"status": "cancelled"},
+        headers=customer["headers"],
+    )
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+    cannot_resume = await client.put(
+        f"/api/v1/fulfillment/recurring-plans/{plan_id}/status",
+        json={"status": "active"},
+        headers=customer["headers"],
+    )
+    assert cannot_resume.status_code == 409
+    final_occurrences = await client.get(
+        f"/api/v1/fulfillment/recurring-plans/{plan_id}/occurrences",
+        headers=customer["headers"],
+    )
+    states = {row["status"] for row in final_occurrences.json()["items"]}
+    assert states == {"cancelled", "skipped"}
+
+
+async def test_city_activation_requires_live_category_merchant_stock_and_capacity(api):
+    client, app = api
+    state = await world(client, app, 0)
+    city_id = state["city"]["id"]
+    readiness = await client.get(
+        f"/api/v1/operations/cities/{city_id}/readiness",
+        headers=state["admin"]["headers"],
+    )
+    assert readiness.status_code == 200
+    assert readiness.json()["ready"] is False
+    assert readiness.json()["eligible_branches"] == 0
+
+    rejected = await client.post(
+        f"/api/v1/operations/cities/{city_id}/activate",
+        headers=state["admin"]["headers"],
+    )
+    assert rejected.status_code == 409
+    public_cities = await client.get("/api/v1/geo/cities")
+    assert city_id not in {row["id"] for row in public_cities.json()["items"]}
+    products = await client.get(
+        f"/api/v1/catalog/products?city_id={city_id}",
+        headers=state["customer"]["headers"],
+    )
+    assert products.status_code == 200
+    assert products.json()["items"] == []
+
+    regulated = await post(
+        client,
+        "/catalog/categories",
+        {"name": "Regulated " + uuid4().hex, "regulated": True},
+        state["admin"],
+    )
+    enable_regulated = await client.put(
+        f"/api/v1/geo/zones/{state['zone']['id']}/categories",
+        json={"category_id": regulated["id"], "enabled": True},
+        headers=state["admin"]["headers"],
+    )
+    assert enable_regulated.status_code == 409
+
+
 async def test_unpaid_cancel_releases_capacity_and_stock(api):
     client, app = api
     state = await world(client, app, 1)
@@ -371,6 +568,8 @@ async def test_coupon_limit_and_recurring_occurrence_dedupe(api):
             cart_template={},
             timezone="UTC",
             active=True,
+            status="active",
+            payment_agreement_reference=None,
         )
         plan_id = plan.id
     actor = Principal(str(uid), frozenset())

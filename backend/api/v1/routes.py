@@ -14,13 +14,24 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import aliased
 
+from ai_platform.gateway import agents as AI_AGENTS
 from ai_platform.inference import service as ai_service
 from ai_platform.optimization.dispatch.greedy import greedy_one_to_one
 from backend.api.v1 import schemas as s
 from backend.api.v1.dependencies import DB, Actor
-from backend.application import commerce, finance, identity, logistics
+from backend.application import (
+    ai_agents,
+    city_launch,
+    commerce,
+    finance,
+    identity,
+    logistics,
+    razorpay_payments,
+    recurring,
+)
 from backend.application.common import add, audit, branch_scope, event, now, owned, scoped
 from backend.domain.rules import BusinessError, money
+from backend.integrations.payments.razorpay import RazorpayGateway
 from backend.modules.fulfillment import eta as eta_engine
 from backend.modules.tracking import service as tracking
 from backend.modules.tracking.realtime import publish
@@ -82,6 +93,7 @@ async def auth_budget(request, identity_key):
 
 @router.post("/auth/register", response_model=s.IdOut, status_code=201, tags=["Identity"])
 async def register(body: s.RegisterIn, request: Request):
+    local_auth(request)
     await auth_budget(request, body.email.lower())
     async with request.app.state.sessions.begin() as db:
         return await identity.register(db, body.email, body.password.get_secret_value())
@@ -310,7 +322,7 @@ async def countries(db: DB, cursor: str | None = None, limit: Limit = 50):
 
 
 @router.post("/geo/cities", response_model=s.CityOut, status_code=201, tags=["Geography"])
-async def city(body: s.CityIn, actor: Actor, db: DB):
+async def city(body: s.CityIn, actor: Actor, request: Request, db: DB):
     await scoped(db, actor, "geo.write")
     if body.state_province_id:
         state = await Repository(db).require(F["geo.states_provinces"], body.state_province_id)
@@ -318,7 +330,17 @@ async def city(body: s.CityIn, actor: Actor, db: DB):
             raise BusinessError(
                 "state_country_mismatch", "State/province belongs to another country", 422
             )
-    return await add(db, m.City, **body.model_dump())
+    created = await add(db, m.City, active=False, **body.model_dump())
+    await audit(
+        db,
+        actor,
+        "city.create",
+        created.id,
+        request.state.request_id,
+        current="draft",
+        version=1,
+    )
+    return created
 
 
 @router.get("/geo/cities", response_model=s.Page[s.CityOut], tags=["Geography"])
@@ -379,7 +401,79 @@ async def authorized_cities(actor: Actor, db: DB, cursor: str | None = None, lim
 @router.post("/geo/zones", response_model=s.NamedOut, status_code=201, tags=["Geography"])
 async def zone(body: s.ZoneIn, actor: Actor, db: DB):
     await scoped(db, actor, "geo.write")
-    return await add(db, m.Zone, **body.model_dump())
+    city = await Repository(db).require(m.City, body.city_id)
+    if city.active:
+        raise BusinessError(
+            "city_config_locked", "Suspend the city before adding a new service zone", 409
+        )
+    return await add(db, m.Zone, active=True, **body.model_dump())
+
+
+@router.put("/geo/zones/{zone_id}/categories", tags=["City configuration"])
+async def set_zone_category(
+    zone_id: UUID, body: s.ZoneCategoryIn, actor: Actor, request: Request, db: DB
+):
+    await scoped(db, actor, "geo.write")
+    zone = await Repository(db).require(m.Zone, zone_id)
+    city = await Repository(db).require(m.City, zone.city_id)
+    if city.active:
+        raise BusinessError(
+            "city_config_locked", "Suspend the city before changing launch categories", 409
+        )
+    category = await Repository(db).require(m.Category, body.category_id)
+    if category.regulated and body.enabled:
+        raise BusinessError(
+            "regulated_category_unavailable",
+            "Regulated categories require an approved compliance workflow",
+            409,
+        )
+    previous = await db.scalar(
+        select(m.ZoneCategory)
+        .where(m.ZoneCategory.zone_id == zone.id, m.ZoneCategory.category_id == category.id)
+        .with_for_update()
+    )
+    row = await db.scalar(
+        insert(m.ZoneCategory)
+        .values(zone_id=zone.id, category_id=category.id, enabled=body.enabled)
+        .on_conflict_do_update(
+            index_elements=["zone_id", "category_id"], set_={"enabled": body.enabled}
+        )
+        .returning(m.ZoneCategory)
+    )
+    await audit(
+        db,
+        actor,
+        "city.zone_category_configure",
+        zone.id,
+        request.state.request_id,
+        previous=("enabled" if previous and previous.enabled else "disabled"),
+        current="enabled" if body.enabled else "disabled",
+    )
+    return {
+        "id": row.id,
+        "zone_id": zone.id,
+        "category_id": category.id,
+        "enabled": row.enabled,
+    }
+
+
+@router.get("/operations/cities/{city_id}/readiness", tags=["City configuration"])
+async def get_city_readiness(city_id: UUID, actor: Actor, db: DB):
+    city = await Repository(db).require(m.City, city_id)
+    await scoped(db, actor, "geo.write")
+    return await city_launch.readiness(db, city)
+
+
+@router.post("/operations/cities/{city_id}/activate", tags=["City configuration"])
+async def activate_city(city_id: UUID, actor: Actor, request: Request, db: DB):
+    await scoped(db, actor, "geo.write")
+    return await city_launch.activate(db, actor, city_id, request.state.request_id)
+
+
+@router.post("/operations/cities/{city_id}/suspend", tags=["City configuration"])
+async def suspend_city(city_id: UUID, actor: Actor, request: Request, db: DB):
+    await scoped(db, actor, "geo.write")
+    return await city_launch.deactivate(db, actor, city_id, request.state.request_id)
 
 
 @router.post("/addresses", response_model=s.AddressOut, status_code=201, tags=["Geography"])
@@ -411,7 +505,11 @@ async def branch(body: s.BranchIn, actor: Actor, db: DB):
 async def branches(
     db: DB, city_id: UUID | None = None, cursor: str | None = None, limit: Limit = 50
 ):
-    predicates = [m.Branch.status == "approved", m.Branch.accepting_orders.is_(True)]
+    predicates = [
+        m.Branch.status == "approved",
+        m.Branch.accepting_orders.is_(True),
+        m.Branch.city_id.in_(select(m.City.id).where(m.City.active.is_(True))),
+    ]
     if city_id:
         predicates.append(m.Branch.city_id == city_id)
     rows, next_id = await Repository(db).page(
@@ -668,7 +766,7 @@ async def category(body: s.CategoryIn, actor: Actor, db: DB):
 
 @router.get("/catalog/categories", response_model=s.Page[s.NamedOut], tags=["Catalogue"])
 async def categories(db: DB, cursor: str | None = None, limit: Limit = 50):
-    return await page(db, m.Category, [], s.NamedOut, cursor, limit)
+    return await page(db, m.Category, [m.Category.regulated.is_(False)], s.NamedOut, cursor, limit)
 
 
 @router.get("/catalog/products", response_model=s.Page[s.CatalogProductOut], tags=["Catalogue"])
@@ -690,12 +788,15 @@ async def customer_catalog(
         .join(m.Variant, m.Variant.id == m.Price.variant_id)
         .join(m.Product, m.Product.id == m.Variant.product_id)
         .join(m.Branch, m.Branch.id == m.Price.branch_id)
+        .join(m.City, m.City.id == m.Branch.city_id)
         .join(m.Brand, m.Brand.id == m.Branch.brand_id)
         .join(m.Category, m.Category.id == m.Product.category_id)
         .join(m.Stock, (m.Stock.branch_id == m.Branch.id) & (m.Stock.variant_id == m.Variant.id))
         .where(
             m.Branch.status == "approved",
             m.Branch.accepting_orders.is_(True),
+            m.City.active.is_(True),
+            m.Category.regulated.is_(False),
             m.Product.active.is_(True),
             m.Price.starts_at <= instant,
             or_(m.Price.ends_at.is_(None), m.Price.ends_at > instant),
@@ -1166,12 +1267,15 @@ async def order_payment(order_id: UUID, actor: Actor, db: DB):
     owned(actor, row.user_id)
     payment = await db.scalar(
         select(m.PaymentIntent)
-        .where(m.PaymentIntent.order_id == row.id, m.PaymentIntent.provider == "sandbox")
+        .where(
+            m.PaymentIntent.order_id == row.id,
+            m.PaymentIntent.provider.in_(("sandbox", "razorpay")),
+        )
         .order_by(m.PaymentIntent.created_at.desc())
     )
     if payment is None:
         raise BusinessError(
-            "payment_not_found", "No sandbox payment intent exists for this order", 404
+            "payment_not_found", "No online payment intent exists for this order", 404
         )
     return payment
 
@@ -2864,6 +2968,13 @@ async def ai_recommend_merchants(body: s.RecommendationQueryIn, actor: Actor, db
         )
     )
     if body.category_id:
+        category = await Repository(db).require(m.Category, body.category_id)
+        if category.regulated:
+            raise BusinessError(
+                "regulated_category_unavailable",
+                "Regulated categories require an approved compliance workflow",
+                409,
+            )
         query = query.where(
             m.Branch.id.in_(
                 select(m.BranchArea.branch_id)
@@ -2915,15 +3026,27 @@ async def ai_recommend_merchants(body: s.RecommendationQueryIn, actor: Actor, db
 @router.post("/ai/recommendations/products", tags=["AI intelligence"])
 async def ai_recommend_products(body: s.RecommendationQueryIn, actor: Actor, db: DB):
     city = await Repository(db).require(m.City, body.city_id)
+    if not city.active:
+        raise BusinessError("city_unavailable", "City is not active", 409)
+    if body.category_id:
+        category = await Repository(db).require(m.Category, body.category_id)
+        if category.regulated:
+            raise BusinessError(
+                "regulated_category_unavailable",
+                "Regulated categories require an approved compliance workflow",
+                409,
+            )
     price_model = m.Price
     query = (
         select(m.Product, m.Variant, m.Branch, m.Stock, price_model)
         .join(m.Variant, m.Variant.product_id == m.Product.id)
         .join(m.Stock, m.Stock.variant_id == m.Variant.id)
         .join(m.Branch, m.Branch.id == m.Stock.branch_id)
+        .join(m.Category, m.Category.id == m.Product.category_id)
         .join(price_model, price_model.variant_id == m.Variant.id)
         .where(
             m.Product.active.is_(True),
+            m.Category.regulated.is_(False),
             m.Branch.city_id == city.id,
             m.Branch.status == "approved",
             m.Branch.accepting_orders.is_(True),
@@ -3222,17 +3345,150 @@ async def ai_evaluate_model(model_id: UUID, body: s.AiEvaluateIn, actor: Actor, 
 
 
 @router.get("/ai/copilot/status", tags=["AI copilot"])
-async def ai_copilot_status(actor: Actor):
+async def ai_copilot_status(actor: Actor, request: Request):
+    gateway = request.app.state.ai_gateway
     return {
-        "status": "unavailable",
-        "provider_configured": False,
-        "provenance": "no_llm_provider_configured",
+        "status": "configured" if gateway.available else "deterministic_fallback",
+        "provider_configured": gateway.available,
+        "provider": request.app.state.settings.ai_provider,
+        "model": request.app.state.settings.ai_model or None,
+        "agents": [
+            {"id": spec.key, "purpose": spec.purpose, "read_only_tools": list(spec.tools)}
+            for spec in AI_AGENTS.values()
+        ],
+        "provenance": "shared_gateway_role_scoped_read_only_context",
+    }
+
+
+@router.post(
+    "/ai/agents/{agent}/query",
+    response_model=s.AiAgentQueryOut,
+    tags=["AI agents"],
+)
+async def ai_agent_query(
+    agent: str, body: s.AiAgentQueryIn, actor: Actor, request: Request, db: DB
+):
+    spec = AI_AGENTS.get(agent)
+    if spec is None:
+        raise BusinessError("agent_not_found", "AI assistant is not available", 404)
+    # Redis is the shared limiter. If it is unavailable, never send this request to an external
+    # provider; still return the scoped deterministic evidence summary.
+    allow_provider = request.app.state.ai_gateway.available
+    try:
+        bucket = int(now().timestamp()) // 60
+        key = f"quickbuddy:ai:rate:{actor.subject}:{bucket}"
+        count = await request.app.state.redis.incr(key)
+        if count == 1:
+            await request.app.state.redis.expire(key, 120)
+        if count > 20:
+            raise BusinessError("rate_limited", "AI request rate limit exceeded", 429)
+    except BusinessError:
+        raise
+    except Exception:
+        allow_provider = False
+    evidence = await ai_agents.context_for(db, actor, agent, body)
+    result = await request.app.state.ai_gateway.answer(
+        spec, body.question, evidence, allow_provider
+    )
+    question_digest = hashlib.sha256(body.question.encode()).hexdigest()
+    baseline_key = {
+        "customer": "recommendations",
+        "merchant": "recommendations",
+        "pilot": "dispatch",
+        "city": "demand",
+        "admin": "risk",
+        "support": "risk",
+    }[agent]
+    await ai_service.log_prediction(
+        db,
+        baseline_key,
+        actor.subject,
+        f"{agent}_assistant_query",
+        {"question_digest": question_digest, "agent": agent},
+        {
+            "provider": result.provider,
+            "model": result.model,
+            "fallback": result.fallback,
+            "latency_ms": result.latency_ms,
+        },
+    )
+    return {
+        "agent": agent,
+        "answer": result.answer,
+        "evidence": evidence,
+        "provider": result.provider,
+        "model": result.model,
+        "fallback": result.fallback,
+        "latency_ms": result.latency_ms,
     }
 
 
 @router.post("/ai/copilot/query", tags=["AI copilot"])
 async def ai_copilot_query(body: s.CopilotQueryIn, actor: Actor):
     raise BusinessError("copilot_unavailable", "No approved LLM provider is configured", 503)
+
+
+@router.post(
+    "/fulfillment/recurring-plans",
+    status_code=201,
+    tags=["Recurring commerce"],
+)
+async def create_recurring_plan(body: s.RecurringPlanCreateIn, actor: Actor, db: DB):
+    plan = await recurring.create_plan(db, actor, body)
+    return await recurring.plan_view(db, plan)
+
+
+@router.get("/fulfillment/recurring-plans", tags=["Recurring commerce"])
+async def list_recurring_plans(actor: Actor, db: DB):
+    Plan = F["fulfillment.recurring_order_plans"]
+    plans = (
+        await db.scalars(
+            select(Plan)
+            .where(Plan.user_id == UUID(actor.subject))
+            .order_by(Plan.created_at.desc())
+            .limit(50)
+        )
+    ).all()
+    return {"items": [await recurring.plan_view(db, plan) for plan in plans]}
+
+
+@router.put("/fulfillment/recurring-plans/{plan_id}/status", tags=["Recurring commerce"])
+async def update_recurring_plan_status(
+    plan_id: UUID, body: s.RecurringPlanStatusIn, actor: Actor, db: DB
+):
+    plan = await recurring.set_status(db, actor, plan_id, body.status)
+    return await recurring.plan_view(db, plan)
+
+
+@router.post("/fulfillment/recurring-plans/{plan_id}/skip", tags=["Recurring commerce"])
+async def skip_recurring_date(plan_id: UUID, body: s.RecurringPlanSkipIn, actor: Actor, db: DB):
+    return await recurring.skip_local_date(db, actor, plan_id, body.local_date)
+
+
+@router.get("/fulfillment/recurring-plans/{plan_id}/occurrences", tags=["Recurring commerce"])
+async def list_recurring_occurrences(plan_id: UUID, actor: Actor, db: DB):
+    await recurring.owned_plan(db, actor, plan_id)
+    Occurrence = F["fulfillment.scheduled_order_occurrences"]
+    rows = (
+        await db.scalars(
+            select(Occurrence)
+            .where(Occurrence.plan_id == plan_id)
+            .order_by(Occurrence.scheduled_at)
+            .limit(100)
+        )
+    ).all()
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "scheduled_at": row.scheduled_at,
+                "status": row.status,
+                "revalidation_reason": row.revalidation_reason,
+                "order_id": row.order_id,
+            }
+            for row in rows
+        ]
+    }
 
 
 @router.put("/operations/cities/{city_id}/dispatch-policy", tags=["Dispatch operations"])
@@ -3321,6 +3577,104 @@ async def acknowledge(task_id: UUID, body: s.VersionIn, actor: Actor, request: R
     return await logistics.recipient_complete(
         db, actor, task_id, body.expected_version, request.state.request_id
     )
+
+
+@router.get("/payments/configuration", tags=["Payments"])
+async def payment_configuration(actor: Actor, request: Request):
+    settings = request.app.state.settings
+    enabled = settings.razorpay_enabled and settings.razorpay_mode in {"test", "live"}
+    return {
+        "provider": "razorpay",
+        "online_payment_available": enabled,
+        "sandbox_payment_available": (
+            settings.sandbox_payments_enabled
+            and settings.app_env != "production"
+            and len(settings.sandbox_webhook_secret.get_secret_value()) >= 32
+        ),
+        "mode": settings.razorpay_mode if enabled else "disabled",
+        "key_id": settings.razorpay_key_id.get_secret_value() if enabled else None,
+        "message": None if enabled else "Online payment is currently unavailable.",
+    }
+
+
+@router.post("/payments/intents", tags=["Payments"])
+async def create_payment_intent(
+    body: s.PaymentIn,
+    actor: Actor,
+    request: Request,
+    idempotency_key: Key,
+):
+    factory = getattr(request.app.state, "razorpay_gateway_factory", RazorpayGateway)
+    gateway = factory(request.app.state.settings)
+    return await razorpay_payments.create_order(
+        request.app.state.sessions,
+        actor,
+        body.order_id,
+        idempotency_key,
+        request.state.request_id,
+        gateway,
+    )
+
+
+@router.post("/payments/razorpay/orders", tags=["Payments"], include_in_schema=False)
+async def create_razorpay_order_alias(
+    body: s.PaymentIn, actor: Actor, request: Request, idempotency_key: Key
+):
+    return await create_payment_intent(body, actor, request, idempotency_key)
+
+
+@router.post("/payments/razorpay/verify", tags=["Payments"])
+async def verify_razorpay_payment(body: s.RazorpayVerifyIn, actor: Actor, request: Request):
+    factory = getattr(request.app.state, "razorpay_gateway_factory", RazorpayGateway)
+    gateway = factory(request.app.state.settings)
+    return await razorpay_payments.verify_checkout(
+        request.app.state.sessions,
+        actor,
+        body.order_id,
+        body.payment_id,
+        body.signature,
+        request.state.request_id,
+        gateway,
+    )
+
+
+@router.post("/payments/razorpay/webhook", tags=["Payments"])
+async def razorpay_webhook(
+    request: Request,
+    event_id: Annotated[str, Header(alias="X-Razorpay-Event-Id", min_length=1, max_length=128)],
+    signature: Annotated[str, Header(alias="X-Razorpay-Signature", min_length=64, max_length=64)],
+):
+    factory = getattr(request.app.state, "razorpay_gateway_factory", RazorpayGateway)
+    gateway = factory(request.app.state.settings)
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > 1_048_576:
+                raise BusinessError("payload_too_large", "Webhook payload exceeds limit", 413)
+        except ValueError as exc:
+            raise BusinessError("invalid_content_length", "Invalid content length", 400) from exc
+    chunks = bytearray()
+    async for chunk in request.stream():
+        chunks.extend(chunk)
+        if len(chunks) > 1_048_576:
+            raise BusinessError("payload_too_large", "Webhook payload exceeds limit", 413)
+    payload = bytes(chunks)
+    return await razorpay_payments.receive_webhook(
+        request.app.state.sessions,
+        payload,
+        event_id,
+        signature,
+        request.state.request_id,
+        gateway,
+    )
+
+
+@router.get("/payments/{payment_id}", response_model=s.PaymentOut, tags=["Payments"])
+async def get_payment(payment_id: UUID, actor: Actor, db: DB):
+    payment = await Repository(db).require(m.PaymentIntent, payment_id)
+    order = await Repository(db).require(m.Order, payment.order_id)
+    owned(actor, order.user_id)
+    return payment
 
 
 @router.post("/finance/currencies", response_model=s.IdOut, status_code=201, tags=["Finance"])
@@ -3715,6 +4069,102 @@ async def request_refund_approval(body: s.RefundApprovalIn, actor: Actor, db: DB
         status="pending",
         **body.model_dump(),
     )
+
+
+@router.get("/finance/authorized-organizations", tags=["Finance"])
+async def finance_organizations(actor: Actor, db: DB):
+    """List only organizations for which the current user has finance.read."""
+    user = await db.get(m.User, UUID(actor.subject))
+    if not user or user.status != "active":
+        raise BusinessError("forbidden", "Access denied", 403)
+    assignments = (
+        await db.execute(
+            select(m.RoleAssignment, m.Role.name)
+            .join(m.Role)
+            .join(m.RolePermission, m.RolePermission.role_id == m.Role.id)
+            .join(m.Permission, m.Permission.id == m.RolePermission.permission_id)
+            .where(
+                m.RoleAssignment.user_id == user.id,
+                m.Permission.code == "finance.read",
+            )
+        )
+    ).all()
+    is_platform_admin = any(
+        role == "platform_super_admin" and row.organization_id is None for row, role in assignments
+    )
+    if is_platform_admin:
+        rows = (await db.scalars(select(m.Organization).order_by(m.Organization.name))).all()
+    else:
+        organization_ids = {
+            row.organization_id
+            for row, _ in assignments
+            if row.organization_id and row.city_id is None and row.branch_id is None
+        }
+        if organization_ids:
+            memberships = set(
+                (
+                    await db.scalars(
+                        select(m.Membership.organization_id).where(
+                            m.Membership.user_id == user.id,
+                            m.Membership.status == "active",
+                            m.Membership.organization_id.in_(organization_ids),
+                        )
+                    )
+                ).all()
+            )
+            organization_ids &= memberships
+        rows = (
+            (
+                await db.scalars(
+                    select(m.Organization)
+                    .where(m.Organization.id.in_(organization_ids))
+                    .order_by(m.Organization.name)
+                )
+            ).all()
+            if organization_ids
+            else []
+        )
+    return {"items": [{"id": row.id, "name": row.name} for row in rows]}
+
+
+@router.get("/finance/refund-approvals", tags=["Finance"])
+async def refund_approval_queue(
+    organization_id: UUID,
+    actor: Actor,
+    request: Request,
+    db: DB,
+    cursor: str | None = None,
+    limit: Limit = 50,
+):
+    await scoped(db, actor, "finance.read", organization_id)
+    Approval = F["operations.refund_approval_requests"]
+    rows, next_id = await Repository(db).page(
+        Approval,
+        [Approval.organization_id == organization_id],
+        after=decode_cursor(cursor),
+        limit=limit,
+    )
+    for row in rows:
+        await audit(
+            db, actor, "refund_approval.read", row.id, request.state.request_id, organization_id
+        )
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "order_id": row.order_id,
+                "requested_by": row.requested_by,
+                "organization_id": row.organization_id,
+                "amount": str(row.amount),
+                "status": row.status,
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ],
+        "next_cursor": (
+            base64.urlsafe_b64encode(next_id.bytes).decode().rstrip("=") if next_id else None
+        ),
+    }
 
 
 @router.post(

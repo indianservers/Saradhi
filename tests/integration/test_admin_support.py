@@ -130,7 +130,7 @@ async def test_org_scoped_support_agent_cannot_list_global_customer_tickets(api)
 
 async def test_city_operator_picker_and_dispatch_are_city_scoped(api):
     client, app = api
-    state = await world(client, app, count=0)
+    state = await world(client, app, count=1)
     other_city = await post(
         client,
         "/geo/cities",

@@ -823,7 +823,9 @@ def register():
             "timezone": "text",
             "payment_agreement_reference": "text?",
             "active": "bool",
+            "status": "text",
         },
+        checks=["status IN ('active','paused','cancelled')"],
     )
     d(
         "fulfillment",

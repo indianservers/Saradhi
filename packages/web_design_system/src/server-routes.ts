@@ -8,6 +8,8 @@ const readRoutes = [
   /^api\/v1\/merchants\/branches$/,
   /^api\/v1\/ai\/models$/,
   /^api\/v1\/ai\/copilot\/status$/,
+  /^api\/v1\/finance\/authorized-organizations$/,
+  /^api\/v1\/finance\/refund-approvals$/,
   /^api\/v1\/support\/tickets$/,
   new RegExp(`^api/v1/support/tickets/${uuid}/messages$`),
   new RegExp(
@@ -15,6 +17,7 @@ const readRoutes = [
   ),
 ];
 const writeRoutes = [
+  new RegExp(`^api/v1/finance/refund-approvals/${uuid}/decision$`),
   new RegExp(
     `^api/v1/operations/pilot-incidents/${uuid}/(acknowledge|resolve)$`,
   ),

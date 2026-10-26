@@ -26,6 +26,4 @@ def upgrade():
 
 
 def downgrade():
-    raise RuntimeError(
-        "Pilot incident records are forward-only; use a reviewed repair migration"
-    )
+    raise RuntimeError("Pilot incident records are forward-only; use a reviewed repair migration")

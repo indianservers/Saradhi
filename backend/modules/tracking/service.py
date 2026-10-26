@@ -68,9 +68,7 @@ async def ingest_location(session, actor, values, settings):
         write.on_conflict_do_update(
             index_elements=["pilot_id"],
             set_=data,
-            where=(
-                m.LatestLocation.client_sequence < write.excluded.client_sequence
-            )
+            where=(m.LatestLocation.client_sequence < write.excluded.client_sequence)
             & (m.LatestLocation.observed_at < write.excluded.observed_at),
         ).returning(m.LatestLocation.id)
     )

@@ -10,13 +10,14 @@ from uuid import UUID, uuid4
 from fastapi import Depends, FastAPI, Request, WebSocket
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from redis.asyncio import Redis
 from sqlalchemy import select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from ai_platform.gateway import ModelGateway
 from backend.api.v1.routes import router
 from backend.application.common import now, scoped
 from backend.application.identity import LocalTokenVerifier
@@ -25,6 +26,7 @@ from backend.integrations.maps.routing import UnavailableRoutingProvider
 from backend.modules.tracking.realtime import serve_socket
 from backend.persistence import models as m
 from backend.persistence.foundations import FOUNDATION_MODELS as F
+from backend.shared import metrics
 from backend.shared.auth import OIDCVerifier, Principal, current_principal
 from backend.shared.contracts import ErrorBody, ErrorResponse, Health, PrincipalView
 from backend.shared.database import create_database, session_scope
@@ -67,6 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app):
         app.state.settings = settings
+        app.state.ai_gateway = ModelGateway(settings)
         app.state.engine = create_database(settings)
         app.state.sessions = async_sessionmaker(app.state.engine, expire_on_commit=False)
         app.state.routing_provider = UnavailableRoutingProvider()
@@ -81,6 +84,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             else OIDCVerifier(settings)
         )
         yield
+        await app.state.ai_gateway.close()
         await app.state.redis.aclose()
         await app.state.engine.dispose()
 
@@ -113,6 +117,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "unhandled_exception", extra={"request_id": request.state.request_id}
             )
             response = error(request, 500, "internal_error", "An internal error occurred")
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", "unmatched")
+        metrics.http_requests.labels(request.method, route_path, str(response.status_code)).inc()
+        metrics.http_request_duration.labels(request.method, route_path).observe(
+            perf_counter() - start
+        )
         response.headers["X-Request-ID"] = request.state.request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Cache-Control"] = "no-store"
@@ -178,6 +188,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health/live", response_model=Health, operation_id="health_live")
     async def live():
         return Health(status="ok")
+
+    @app.get("/metrics", include_in_schema=False)
+    async def prometheus_metrics(request: Request):
+        if not settings.metrics_enabled:
+            return error(request, 404, "not_found", "Metrics are disabled")
+        payload, content_type = metrics.render_metrics(app.state.engine.pool)
+        return Response(payload, headers={"Content-Type": content_type})
 
     @app.get("/health/capabilities", operation_id="health_capabilities")
     async def capabilities():
@@ -402,14 +419,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception:
             await websocket.close(code=1013, reason="realtime_degraded")
             return
-        await serve_socket(
-            websocket,
-            app.state.redis,
-            topic,
-            f"quickbuddy:realtime:connections:{user.id}",
-            settings.tracking_websocket_max_connections,
-            still_authorized,
-        )
+        metrics.websocket_connections.inc()
+        try:
+            await serve_socket(
+                websocket,
+                app.state.redis,
+                topic,
+                f"quickbuddy:realtime:connections:{user.id}",
+                settings.tracking_websocket_max_connections,
+                still_authorized,
+            )
+        finally:
+            metrics.websocket_connections.dec()
 
     return app
 

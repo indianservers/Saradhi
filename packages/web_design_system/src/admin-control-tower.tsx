@@ -9,6 +9,7 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
+  DollarSign,
   Clock3,
   Command,
   FileText,
@@ -21,6 +22,16 @@ import {
 } from "lucide-react";
 
 type City = { id: string; name: string };
+type Organization = { id: string; name: string };
+type RefundApproval = {
+  id: string;
+  order_id: string;
+  requested_by: string;
+  organization_id: string;
+  amount: string;
+  status: string;
+  created_at: string;
+};
 type Branch = {
   id: string;
   name: string;
@@ -158,6 +169,7 @@ function Metric({
 
 export function AdminControlTower() {
   const [cityId, setCityId] = useState("");
+  const [organizationId, setOrganizationId] = useState("");
   const [screen, setScreen] = useState("overview");
   const cities = useLive<{ items: City[] }>(
     "api/v1/operations/authorized-cities?limit=100",
@@ -181,6 +193,18 @@ export function AdminControlTower() {
     cityId ? `api/v1/merchants/branches?city_id=${cityId}&limit=50` : null,
   );
   const models = useLive<{ items: Model[] }>("api/v1/ai/models");
+  const organizations = useLive<{ items: Organization[] }>(
+    "api/v1/finance/authorized-organizations",
+  );
+  useEffect(() => {
+    if (!organizationId && organizations.data?.items.length)
+      setOrganizationId(organizations.data.items[0].id);
+  }, [organizationId, organizations.data]);
+  const refunds = useLive<{ items: RefundApproval[] }>(
+    organizationId
+      ? `api/v1/finance/refund-approvals?organization_id=${organizationId}&limit=100`
+      : null,
+  );
   const selected = cities.data?.items.find((city) => city.id === cityId);
   const items = dispatch.data?.counts ?? {};
   const activeTasks = Object.values(items).reduce(
@@ -194,6 +218,7 @@ export function AdminControlTower() {
     ["fleet", "Fleet", Bike],
     ["incidents", "Incidents", AlertTriangle],
     ["ai", "AI operations", Sparkles],
+    ["finance", "Refund approvals", DollarSign],
   ] as const;
   const health = [dispatch, fleet, incidents].some((x) => x.error)
     ? "Limited"
@@ -201,9 +226,16 @@ export function AdminControlTower() {
       ? "Connected"
       : "Checking";
   const refresh = () =>
-    [cities, dispatch, fleet, incidents, branches, models].forEach((resource) =>
-      resource.reload(),
-    );
+    [
+      cities,
+      dispatch,
+      fleet,
+      incidents,
+      branches,
+      models,
+      organizations,
+      refunds,
+    ].forEach((resource) => resource.reload());
   async function signOut() {
     await fetch("/api/session", { method: "DELETE" });
     window.location.assign("/login");
@@ -268,6 +300,27 @@ export function AdminControlTower() {
               </select>
               <ChevronDown size={13} />
             </label>
+            {screen === "finance" && (
+              <label
+                className="qb-city-select"
+                aria-label="Finance organization"
+              >
+                <Building2 size={14} />
+                <select
+                  aria-label="Finance organization"
+                  value={organizationId}
+                  onChange={(event) => setOrganizationId(event.target.value)}
+                >
+                  <option value="">Select organization</option>
+                  {(organizations.data?.items ?? []).map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={13} />
+              </label>
+            )}
             <button
               className="qb-icon-button"
               aria-label="Refresh dashboard"
@@ -609,6 +662,7 @@ export function AdminControlTower() {
               )}
             </section>
           )}
+          {screen === "finance" && <RefundApprovalQueue resource={refunds} />}
           <footer className="qb-footer">
             <span>QUICKBUDDY PLATFORM</span>
             <span>
@@ -618,6 +672,140 @@ export function AdminControlTower() {
         </section>
       </main>
     </div>
+  );
+}
+
+function RefundApprovalQueue({
+  resource,
+}: {
+  resource: Result<{ items: RefundApproval[] }>;
+}) {
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [reasons, setReasons] = useState<Record<string, string>>({});
+  async function decide(
+    row: RefundApproval,
+    decision: "approved" | "rejected",
+  ) {
+    const reason = reasons[row.id]?.trim() ?? "";
+    if (reason.length < 5) {
+      setError("Enter a decision reason of at least 5 characters.");
+      return;
+    }
+    setBusy(row.id);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/backend/api/v1/finance/refund-approvals/${row.id}/decision`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ decision, reason }),
+        },
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(body.detail ?? `Decision failed (${response.status})`);
+      resource.reload();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Decision failed");
+    } finally {
+      setBusy("");
+    }
+  }
+  return (
+    <section className="qb-panel">
+      <div className="qb-panel-head">
+        <div>
+          <h2>Refund approval requests</h2>
+          <p>
+            Amounts and decisions come from the finance approval ledger.
+            Requesters cannot approve their own requests; the backend rechecks
+            finance.write scope.
+          </p>
+        </div>
+      </div>
+      <Notice error={error || resource.error} />
+      {resource.data?.items.length ? (
+        <div className="qb-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Requested</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Decision reason</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resource.data.items.map((row) => (
+                <tr key={row.id}>
+                  <td className="mono">{row.order_id}</td>
+                  <td>{new Date(row.created_at).toLocaleString()}</td>
+                  <td>{row.amount}</td>
+                  <td>{row.status}</td>
+                  <td>
+                    {row.status === "pending" ? (
+                      <input
+                        aria-label={`Decision reason for ${row.id}`}
+                        maxLength={500}
+                        value={reasons[row.id] ?? ""}
+                        onChange={(event) =>
+                          setReasons((current) => ({
+                            ...current,
+                            [row.id]: event.target.value,
+                          }))
+                        }
+                        placeholder="Required reason"
+                      />
+                    ) : (
+                      "Recorded in audit trail"
+                    )}
+                  </td>
+                  <td>
+                    {row.status === "pending" ? (
+                      <div className="qb-inline-actions">
+                        <button
+                          className="qb-outline"
+                          disabled={busy === row.id}
+                          onClick={() => void decide(row, "approved")}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          className="qb-outline"
+                          disabled={busy === row.id}
+                          onClick={() => void decide(row, "rejected")}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        !resource.error && (
+          <Empty
+            title={
+              resource.loading ? "Loading approvals" : "No refund requests"
+            }
+            detail={
+              resource.loading
+                ? "Reading organization scoped finance records."
+                : "No refund requests exist in the selected organization."
+            }
+          />
+        )
+      )}
+    </section>
   );
 }
 

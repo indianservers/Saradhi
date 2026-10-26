@@ -166,12 +166,25 @@ async def world(client, app, count=2):
     zone = await post(
         client, "/geo/zones", {"city_id": city["id"], "name": "Integration zone"}, admin
     )
+    category_enabled = await client.put(
+        f"/api/v1/geo/zones/{zone['id']}/categories",
+        json={"category_id": category["id"], "enabled": True},
+        headers=admin["headers"],
+    )
+    assert category_enabled.status_code == 200, category_enabled.text
     shops = []
     for index in range(count):
         merchant = await user(client, app)
         shops.append(
             await setup_shop(client, app, admin, merchant, city["id"], category["id"], index)
         )
+    if shops:
+        activation = await client.post(
+            f"/api/v1/operations/cities/{city['id']}/activate",
+            headers=admin["headers"],
+        )
+        assert activation.status_code == 200, activation.text
+        city["active"] = True
     return {
         "admin": admin,
         "customer": customer,

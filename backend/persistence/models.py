@@ -740,6 +740,28 @@ class Webhook(Record, Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class RazorpayWebhookEvent(Record, Base):
+    __tablename__ = "razorpay_webhook_events"
+    __table_args__ = (
+        UniqueConstraint("event_id"),
+        Index("ix_razorpay_webhook_events_provider_order_id", "provider_order_id"),
+        CheckConstraint(
+            "status IN ('received','processed','unmatched','ignored','rejected')",
+            name="razorpay_webhook_status",
+        ),
+        {"schema": "finance"},
+    )
+    event_id: Mapped[str] = mapped_column(Text)
+    event_type: Mapped[str] = mapped_column(Text)
+    payload_hash: Mapped[str] = mapped_column(Text)
+    payment_id: Mapped[UUID | None] = fk("finance.payment_intents.id", nullable=True)
+    provider_payment_id: Mapped[str | None] = mapped_column(Text)
+    provider_order_id: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, default="received")
+    error_code: Mapped[str | None] = mapped_column(Text)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Refund(Record, Base):
     __tablename__ = "payment_refunds"
     __table_args__ = (

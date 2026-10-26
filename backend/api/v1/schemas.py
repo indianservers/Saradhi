@@ -1,6 +1,6 @@
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Annotated, Literal, TypeVar
+from typing import Annotated, Any, Literal, TypeVar
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -99,6 +99,11 @@ class CityOut(NamedOut):
 
 class ZoneIn(NameIn):
     city_id: UUID
+
+
+class ZoneCategoryIn(Input):
+    category_id: UUID
+    enabled: bool
 
 
 class AddressIn(Input):
@@ -507,8 +512,61 @@ class CopilotQueryIn(Input):
     question: str = Field(min_length=1, max_length=2000)
 
 
+class AiAgentQueryIn(Input):
+    question: str = Field(min_length=1, max_length=1200)
+    city_id: UUID | None = None
+    branch_id: UUID | None = None
+    organization_id: UUID | None = None
+    ticket_id: UUID | None = None
+
+
+class AiAgentQueryOut(Output):
+    agent: str
+    answer: str
+    evidence: dict[str, Any]
+    provider: str
+    model: str
+    fallback: bool
+    latency_ms: int
+
+
 class AiEvaluateIn(Input):
     city_id: UUID
+
+
+class RecurringPlanCreateIn(Input):
+    cart_id: UUID
+    timezone: str
+    frequency: Literal["daily", "weekly", "monthly"]
+    interval: int = Field(default=1, ge=1, le=30)
+    local_time: time
+    start_date: date
+    end_date: date | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, value):
+        try:
+            ZoneInfo(value)
+        except (ValueError, ZoneInfoNotFoundError) as exc:
+            raise ValueError("Use a valid IANA time zone") from exc
+        return value
+
+    @field_validator("end_date")
+    @classmethod
+    def valid_plan_dates(cls, value, info):
+        start_date = info.data.get("start_date")
+        if value and start_date and value < start_date:
+            raise ValueError("End date must be on or after the start date")
+        return value
+
+
+class RecurringPlanStatusIn(Input):
+    status: Literal["active", "paused", "cancelled"]
+
+
+class RecurringPlanSkipIn(Input):
+    local_date: date
 
 
 class AssignmentOut(StateOut):
@@ -618,6 +676,12 @@ class JournalIn(Input):
 
 class PaymentIn(Input):
     order_id: UUID
+
+
+class RazorpayVerifyIn(Input):
+    order_id: str = Field(min_length=8, max_length=64, pattern=r"^order_[A-Za-z0-9]+$")
+    payment_id: str = Field(min_length=8, max_length=64, pattern=r"^pay_[A-Za-z0-9]+$")
+    signature: str = Field(min_length=64, max_length=64, pattern=r"^[A-Fa-f0-9]{64}$")
 
 
 class PaymentOut(StateOut):

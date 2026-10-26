@@ -22,6 +22,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.lock && pip install --no-deps -e .
+      - run: python -m pip install pip-audit && pip-audit -r requirements.lock
       - run: ruff check backend tools tests && ruff format --check backend tools tests
       - run: pytest
       - run: python tools/validation/structure.py
@@ -36,6 +37,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run contracts && git diff --exit-code -- packages/typescript_sdk/src/schema.d.ts
       - run: npm run typecheck && npm run format:check && npm run build
   redis-worker:
@@ -52,3 +54,14 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.lock && pip install --no-deps -e .
       - run: python -m backend.scripts.worker_smoke
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - name: Validate AWS root without backend or credentials
+        run: terraform -chdir=infrastructure/terraform/aws init -backend=false && terraform -chdir=infrastructure/terraform/aws validate
+      - name: Validate DigitalOcean root without backend or credentials
+        run: terraform -chdir=infrastructure/terraform/digitalocean init -backend=false && terraform -chdir=infrastructure/terraform/digitalocean validate

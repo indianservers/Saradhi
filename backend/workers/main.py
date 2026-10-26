@@ -4,7 +4,7 @@ from arq import cron
 from arq.connections import RedisSettings
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from backend.application import events, logistics, maintenance
+from backend.application import events, logistics, maintenance, recurring
 from backend.integrations.realtime.redis_publisher import RedisEventPublisher
 from backend.shared.database import create_database
 from backend.shared.logging import configure_logging
@@ -45,12 +45,24 @@ async def run_bounded_maintenance(ctx):
         return {"expired_reservations": expired, "pruned": pruned}
 
 
+async def expand_recurring_schedules(ctx):
+    async with ctx["sessions"].begin() as session:
+        return await recurring.expand_active_plans(session, limit=100, horizon_days=14)
+
+
 class WorkerSettings:
-    functions = [demonstration, relay_outbox, expire_dispatch_offers, run_bounded_maintenance]
+    functions = [
+        demonstration,
+        relay_outbox,
+        expire_dispatch_offers,
+        run_bounded_maintenance,
+        expand_recurring_schedules,
+    ]
     cron_jobs = [
         cron(relay_outbox, second=set(range(60)), run_at_startup=True),
         cron(expire_dispatch_offers, second=set(range(0, 60, 5)), run_at_startup=True),
         cron(run_bounded_maintenance, second={0}, run_at_startup=True),
+        cron(expand_recurring_schedules, minute={0, 15, 30, 45}, run_at_startup=True),
     ]
     on_startup = startup
     on_shutdown = shutdown
