@@ -1,19 +1,20 @@
 # Quickbuddy
 
-Phase 1 foundation for six independent clients and one shared FastAPI modular monolith.
-No business schema, customer records, operational dashboards, payment integration or cloud deployment exists yet.
+A six-application hyperlocal platform with one shared FastAPI modular backend. Phase 2 now
+includes a real PostgreSQL schema, scoped password/session authentication, multi-merchant
+checkout, stock/batch reservations, merchant preparation, pilot/recipient workflows, guarded
+ledger posting and transactional outbox/inbox infrastructure.
 
-Start with [DEVELOPMENT.md](DEVELOPMENT.md). Verified results and blockers are in
-[docs/operations/phase-1-validation.md](docs/operations/phase-1-validation.md).
+Start with [DEVELOPMENT.md](DEVELOPMENT.md), [Phase 2 results](docs/operations/phase-2-validation.md),
+[API reference](docs/api/api-reference.md) and [database architecture](docs/database/enterprise-schema.md).
+The Phase 1 validation report is historical. Flutter SDK, PostGIS and Redis limitations remain
+explicit. No cloud deployment or production gateway is configured and frontend screens were not
+expanded in Phase 2. The application shells and generated shared TypeScript client are preserved.
 
-Applications: Flutter customer, pilot and merchant; Next.js company administration,
-city operations and support. Shared mobile and web UI prevent duplicated application logic.
-The public web pages show the application shell; /workspace requires a server-verified
-access token and the appropriate role. OIDC sign-in provisioning is a later integration.
+Local PostgreSQL 17.11 runs in the user-approved isolated .local cluster on 127.0.0.1:5433;
+quickbuddy_dev and quickbuddy_test have separate non-superuser owners. Existing port 5432 was
+not altered. Secrets and data are ignored, Windows ACL-restricted local files. There is no
+default administrator account. Business fixtures exist only in the dedicated test database.
 
-Backend: Python 3.12, FastAPI, Pydantic settings, SQLAlchemy 2 async/asyncpg, Alembic,
-Redis and ARQ. npm workspaces pin web dependencies in package-lock.json;
-requirements.lock pins the verified Python environment. Containers do not include PostgreSQL.
-
-Architecture decisions: docs/decisions/0001-foundation.md. Start Phase 2 only after
-reviewing docs/database/schema-design-principles.md and the Phase 2 gate in the validation report.
+Use tools/dev.ps1 for migrations, API, tests, lint and contracts. Source, migrations and docs
+are project artifacts; .env, .secrets and .local must not be committed or copied into images.

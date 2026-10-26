@@ -1,65 +1,85 @@
-# Local development
+# Local development — Phase 2
 
-Run commands in PowerShell from the monorepo root. All dependency installs stay local.
-No global software installation or service modification is performed by these scripts.
+Run PowerShell commands from the monorepo root. Python dependencies are project-local in .venv
+and Node dependencies in npm workspaces. No global installation or cloud provisioning occurs.
 
 ```powershell
-./tools/dev.ps1 verify
-Copy-Item .env.example .env # once only; preserve an existing .env
-./tools/dev.ps1 install
-./tools/dev.ps1 infra       # Redis only; requires Docker
-./tools/dev.ps1 api         # terminal 1, localhost:8000
-./tools/dev.ps1 web -App company_admin   # terminal 2, localhost:3000
-./tools/dev.ps1 web -App city_operations # localhost:3001
-./tools/dev.ps1 web -App support_console # localhost:3002
-./tools/dev.ps1 worker      # separate terminal; requires Redis
+./tools/local-postgres.ps1 status
+./tools/local-postgres.ps1 start  # only if the isolated project cluster is stopped
+./tools/dev.ps1 database
+./tools/dev.ps1 migrate
+./tools/dev.ps1 migrate-test
+./tools/dev.ps1 api
 ```
 
-An existing Redis can replace Docker by setting REDIS_URL. PostgreSQL is the existing host
-installation; no replacement server is included. Supply authorized credentials for
-quickbuddy_dev in .env before running `./tools/dev.ps1 database`. Do not reuse another
-project's database, inspect its secrets or guess a password. See database/scripts/README.md.
+The approved isolated cluster reuses the detected PostgreSQL 17.11 binaries and stores data
+inside .local/postgres-data on 127.0.0.1:5433. tools/local-postgres.ps1 reads the detected binary
+path from ignored .local/postgres-toolchain.json. It never changes the unrelated 5432 server.
+`stop` stops only this project's data directory. .env already contains generated separate
+DATABASE_URL/TEST_DATABASE_URL and AUTH_PRIVATE_KEY_PATH; do not overwrite it with the example.
+The local owners are not superusers and cannot create roles/databases. No default user exists.
+
+API: http://127.0.0.1:8000; Swagger: /docs; OpenAPI: /openapi.json. Liveness checks the process;
+readiness also checks PostgreSQL and Redis. Redis is missing, so readiness remains 503 while
+PostgreSQL and database-backed APIs work. The PostgreSQL worker does not need Redis:
 
 ```powershell
-./tools/dev.ps1 contracts
+./.venv/Scripts/python.exe -m backend.workers.database_worker --once
+# Omit --once to poll persisted due state; no in-memory business scheduling authority.
+./tools/dev.ps1 integration
 ./tools/dev.ps1 test
 ./tools/dev.ps1 lint
-./tools/dev.ps1 format
-npm run build
-./tools/dev.ps1 worker-smoke
-./tools/dev.ps1 worker-health
+./tools/dev.ps1 contracts
+./.venv/Scripts/python.exe tools/generators/schema_artifacts.py
+./.venv/Scripts/python.exe tools/generators/api_reference.py
+./.venv/Scripts/python.exe -m backend.scripts.database_report
 ```
 
-Worker health requires an active worker; smoke enqueues and runs one harmless demonstration.
-It requires a real Redis. No mock is reported as a Redis integration pass.
+Integration tests use only local quickbuddy_test, migrate it without resetting it and keep
+uniquely named test fixtures/history. They never drop/truncate dev or test databases. The suite
+includes 100 independently authenticated concurrent checkouts. If TEST_DATABASE_URL is missing,
+the integration suite explicitly skips; missing infrastructure is never reported as passing.
+CI has an ephemeral PostgreSQL service and executes the same real integration suite.
 
-Flutter SDK/Android SDK must be installed explicitly by the developer. No system-wide install
-is attempted. Once available:
+Registration/login examples are in docs/api/sample-requests.ps1. To provision platform access
+for an actual named local user after registering it, explicitly run:
+`./.venv/Scripts/python.exe -m backend.scripts.grant_platform_admin --user-id <existing-user-uuid>`.
+This local operator command creates no password and records the grant. Do not grant arbitrary
+users access. Merchant self-onboarding receives only its own merchant-owner scope. Review and
+finance permissions still require authorized, separate actors.
+
+For a NEW checkout on another machine, install dependencies with `./tools/dev.ps1 install`,
+configure authorized dedicated local URLs in ignored .env, generate a development signing key
+with `python -m backend.scripts.init_auth`, then migrate. Local bootstrap scripts for the isolated
+cluster deliberately refuse to replace existing credentials/databases. Never blindly rerun initdb
+or overwrite .env. Keep keys/connection credentials private; production uses external secret storage.
+
+Web apps remain independently runnable (separate terminals):
 
 ```powershell
-./tools/dev.ps1 flutter-init -App customer_app
-./tools/dev.ps1 flutter-init -App pilot_app
-./tools/dev.ps1 flutter-init -App merchant_app
-./tools/dev.ps1 mobile -App customer_app # web port 8080
-./tools/dev.ps1 mobile -App pilot_app    # web port 8081
-./tools/dev.ps1 mobile -App merchant_app # web port 8082
+./tools/dev.ps1 web -App company_admin     # 3000
+./tools/dev.ps1 web -App city_operations   # 3001
+./tools/dev.ps1 web -App support_console   # 3002
+npm run build
 ```
 
-Flutter initialization creates missing Android/iOS/web runners using flutter create in a
-staging directory. It never overwrites app source. Flutter web builds are `flutter build web`
-inside each app. Android emulator API address is http://10.0.2.2:8000; physical devices need
-an explicitly configured host. iOS compilation requires macOS/Xcode. Android requires
-Android SDK/licenses. Release app identifiers/signing and secure storage setup remain release gates.
+No frontend screens changed in Phase 2. API_BASE_URL is each web app's server-side .env.local
+configuration. The guarded workspace checks /api/v1/me; a proper HttpOnly/Secure callback must
+be wired before browser sign-in. Do not persist tokens in localStorage or NEXT_PUBLIC values.
 
-The .env at repository root is read by Python. Each web app reads its own .env.local
-(API_BASE_URL, server-only). Flutter uses compile-time --dart-define values. Never put secrets
-in NEXT_PUBLIC variables or dart defines. Access tokens must never enter browser localStorage.
+Flutter/Dart/Android tools remain unavailable. Once explicitly installed, use:
+`./tools/dev.ps1 flutter-init -App customer_app` (repeat for pilot_app/merchant_app), then
+`./tools/dev.ps1 mobile -App customer_app` (ports 8080/8081/8082 respectively).
+Each app README describes build/test commands and Android emulator API address 10.0.2.2.
+Dart contract toolchain is documented in packages/api_contracts/README.md; it was not run locally.
 
-Docker full profile is optional: set DOCKER_DATABASE_URL with host.docker.internal and authorized
-quickbuddy_dev credentials, then `docker compose --profile full up --build`. The host PostgreSQL
-must explicitly permit the container client; this project does not change host authentication.
-Containers use Redis on the internal Compose network. Shut down via `docker compose down`;
-add no -v unless explicitly choosing to discard demo Redis state.
+Docker/Redis are still unavailable. If explicitly installed later, `./tools/dev.ps1 infra`
+starts Redis only. ARQ demonstration commands remain worker/worker-smoke/worker-health.
+The optional full Compose profile needs a separate DOCKER_DATABASE_URL using host.docker.internal;
+the host PostgreSQL authentication must explicitly permit the client. Compose/PostGIS paths have
+not been validated here and do not silently alter database service configuration.
 
-Unix: python3 -m venv .venv; .venv/bin/pip install -r requirements.lock; npm ci.
-Use .venv/bin/python -m uvicorn backend.api.app.main:app --no-access-log and the same npm scripts.
+PostGIS: read docs/database/postgis-requirements.md. Until the compatible extension, reviewed
+migration, real service polygons and policy tests exist, courier serviceability correctly fails.
+Sandbox payments are disabled in .env; only automated test settings explicitly enable the
+non-network deterministic adapter. No production charge/payout/provider SMS is performed.

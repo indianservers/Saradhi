@@ -1,24 +1,30 @@
 import asyncio
+import hashlib
 import logging
 import re
 from contextlib import asynccontextmanager
 from time import perf_counter
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, WebSocket
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
-from sqlalchemy import text
+from sqlalchemy import select, text, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.api.v1.routes import router
+from backend.application.common import now, scoped
 from backend.application.identity import LocalTokenVerifier
 from backend.domain.rules import BusinessError
+from backend.integrations.maps.routing import UnavailableRoutingProvider
+from backend.modules.tracking.realtime import serve_socket
+from backend.persistence import models as m
+from backend.persistence.foundations import FOUNDATION_MODELS as F
 from backend.shared.auth import OIDCVerifier, Principal, current_principal
 from backend.shared.contracts import ErrorBody, ErrorResponse, Health, PrincipalView
 from backend.shared.database import create_database, session_scope
@@ -63,8 +69,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = settings
         app.state.engine = create_database(settings)
         app.state.sessions = async_sessionmaker(app.state.engine, expire_on_commit=False)
+        app.state.routing_provider = UnavailableRoutingProvider()
         app.state.redis = Redis.from_url(
-            settings.redis_url.get_secret_value(), socket_connect_timeout=2, socket_timeout=2
+            settings.redis_url.get_secret_value(),
+            socket_connect_timeout=0.25,
+            socket_timeout=0.5,
         )
         app.state.token_verifier = (
             LocalTokenVerifier(settings, app.state.sessions)
@@ -170,6 +179,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def live():
         return Health(status="ok")
 
+    @app.get("/health/capabilities", operation_id="health_capabilities")
+    async def capabilities():
+        try:
+            async with app.state.engine.connect() as connection:
+                postgis = await connection.scalar(
+                    text("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname='postgis')")
+                )
+                postgres = "ok"
+        except Exception:
+            postgis, postgres = False, "unavailable"
+        try:
+            await app.state.redis.ping()
+            redis_status = "ok"
+        except Exception:
+            redis_status = "unavailable"
+        routing_status = (
+            "unavailable"
+            if isinstance(app.state.routing_provider, UnavailableRoutingProvider)
+            else "configured"
+        )
+        return {
+            "postgres": postgres,
+            "redis": redis_status,
+            "postgis": "available" if postgis else "unavailable",
+            "road_routing": routing_status,
+            "gps_persistence": postgres == "ok",
+            "live_cross_instance_events": redis_status == "ok",
+            "courier_serviceability": postgis,
+        }
+
     @app.get(
         "/health/ready",
         response_model=Health,
@@ -191,6 +230,187 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return PrincipalView(subject=principal.subject, roles=sorted(principal.roles))
 
     app.include_router(router)
+
+    @app.websocket("/api/v1/realtime")
+    async def realtime(websocket: WebSocket, ticket: str, channel: str):
+        try:
+            kind, raw_id = channel.split(":", 1)
+            channel_id = UUID(raw_id) if kind != "system" else None
+            if kind not in {"order", "delivery", "pilot", "merchant", "city", "system"}:
+                raise ValueError
+        except ValueError:
+            await websocket.close(code=4400, reason="invalid_channel")
+            return
+        token_hash = hashlib.sha256(ticket.encode()).hexdigest()
+        async with app.state.sessions.begin() as db:
+            ticket_model = F["fulfillment.tracking_ws_tickets"]
+            ticket_row = await db.scalar(
+                update(ticket_model)
+                .where(
+                    ticket_model.token_hash == token_hash,
+                    ticket_model.consumed_at.is_(None),
+                    ticket_model.expires_at > now(),
+                )
+                .values(consumed_at=now())
+                .returning(ticket_model)
+            )
+            if not ticket_row:
+                await websocket.close(code=4401, reason="ticket_invalid_or_expired")
+                return
+            user = await db.get(m.User, ticket_row.user_id)
+            if not user or user.status != "active":
+                await websocket.close(code=4401, reason="session_revoked")
+                return
+            roles = set(
+                (
+                    await db.scalars(
+                        select(m.Role.name)
+                        .join(m.RoleAssignment)
+                        .where(m.RoleAssignment.user_id == user.id)
+                    )
+                ).all()
+            )
+            actor = Principal(str(user.id), frozenset(roles))
+            try:
+                if kind == "order":
+                    order = await db.get(m.Order, channel_id)
+                    if not order or order.user_id != user.id:
+                        raise PermissionError
+                    topic = f"order:{channel_id}"
+                elif kind == "pilot":
+                    pilot = await db.scalar(select(m.Pilot).where(m.Pilot.id == channel_id))
+                    if not pilot or pilot.user_id != user.id:
+                        raise PermissionError
+                    topic = f"pilot:{channel_id}"
+                elif kind == "delivery":
+                    task = await db.get(m.DeliveryTask, channel_id)
+                    if not task:
+                        raise PermissionError
+                    unit = await db.get(m.FulfillmentUnit, task.fulfillment_unit_id)
+                    child = await db.get(m.MerchantOrder, unit.merchant_order_id)
+                    order = await db.get(m.Order, child.order_id)
+                    pilot = await db.scalar(select(m.Pilot).where(m.Pilot.user_id == user.id))
+                    is_assigned = bool(
+                        pilot
+                        and await db.scalar(
+                            select(m.Assignment.id)
+                            .where(
+                                m.Assignment.task_id == task.id, m.Assignment.pilot_id == pilot.id
+                            )
+                            .limit(1)
+                        )
+                    )
+                    if order.user_id != user.id and not is_assigned:
+                        branch = await db.get(m.Branch, child.branch_id)
+                        await scoped(
+                            db,
+                            actor,
+                            "dispatch.write",
+                            branch.organization_id,
+                            branch.city_id,
+                            branch.id,
+                        )
+                    topic = f"delivery:{channel_id}"
+                elif kind == "merchant":
+                    await scoped(db, actor, "merchant.write", channel_id)
+                    topic = f"merchant:{channel_id}"
+                elif kind == "city":
+                    await scoped(db, actor, "dispatch.write", city_id=channel_id)
+                    topic = f"city:{channel_id}"
+                else:
+                    if "platform_super_admin" not in roles:
+                        raise PermissionError
+                    topic = "system"
+            except Exception:
+                await websocket.close(code=4403, reason="channel_forbidden")
+                return
+            user_id = user.id
+
+        async def still_authorized():
+            async with app.state.sessions() as session:
+                current_user = await session.get(m.User, user_id)
+                if not current_user or current_user.status != "active":
+                    return False
+                current_roles = set(
+                    (
+                        await session.scalars(
+                            select(m.Role.name)
+                            .join(m.RoleAssignment)
+                            .where(m.RoleAssignment.user_id == user_id)
+                        )
+                    ).all()
+                )
+                current_actor = Principal(str(user_id), frozenset(current_roles))
+                try:
+                    if kind == "order":
+                        current_order = await session.get(m.Order, channel_id)
+                        return bool(current_order and current_order.user_id == user_id)
+                    if kind == "pilot":
+                        current_pilot = await session.scalar(
+                            select(m.Pilot).where(m.Pilot.id == channel_id)
+                        )
+                        return bool(current_pilot and current_pilot.user_id == user_id)
+                    if kind == "delivery":
+                        current_task = await session.get(m.DeliveryTask, channel_id)
+                        if not current_task:
+                            return False
+                        current_unit = await session.get(
+                            m.FulfillmentUnit, current_task.fulfillment_unit_id
+                        )
+                        current_child = await session.get(
+                            m.MerchantOrder, current_unit.merchant_order_id
+                        )
+                        current_order = await session.get(m.Order, current_child.order_id)
+                        current_pilot = await session.scalar(
+                            select(m.Pilot).where(m.Pilot.user_id == user_id)
+                        )
+                        assigned = bool(
+                            current_pilot
+                            and await session.scalar(
+                                select(m.Assignment.id)
+                                .where(
+                                    m.Assignment.task_id == current_task.id,
+                                    m.Assignment.pilot_id == current_pilot.id,
+                                )
+                                .limit(1)
+                            )
+                        )
+                        if current_order.user_id == user_id or assigned:
+                            return True
+                        current_branch = await session.get(m.Branch, current_child.branch_id)
+                        await scoped(
+                            session,
+                            current_actor,
+                            "dispatch.write",
+                            current_branch.organization_id,
+                            current_branch.city_id,
+                            current_branch.id,
+                        )
+                        return True
+                    if kind == "merchant":
+                        await scoped(session, current_actor, "merchant.write", channel_id)
+                        return True
+                    if kind == "city":
+                        await scoped(session, current_actor, "dispatch.write", city_id=channel_id)
+                        return True
+                    return "platform_super_admin" in current_roles
+                except Exception:
+                    return False
+
+        try:
+            await app.state.redis.ping()
+        except Exception:
+            await websocket.close(code=1013, reason="realtime_degraded")
+            return
+        await serve_socket(
+            websocket,
+            app.state.redis,
+            topic,
+            f"quickbuddy:realtime:connections:{user.id}",
+            settings.tracking_websocket_max_connections,
+            still_authorized,
+        )
+
     return app
 
 

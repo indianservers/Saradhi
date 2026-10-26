@@ -1,1 +1,1 @@
-"""Dispatch bounded context. See docs/architecture/module-boundaries.md."""
+"""Deterministic, policy-versioned dispatch candidate scoring."""

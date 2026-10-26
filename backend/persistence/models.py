@@ -166,6 +166,7 @@ class City(Record, Base):
     __tablename__ = "cities"
     __table_args__ = (UniqueConstraint("country_id", "name"), {"schema": "geo"})
     country_id: Mapped[UUID] = fk("geo.countries.id")
+    state_province_id: Mapped[UUID | None] = fk("geo.states_provinces.id")
     name: Mapped[str] = mapped_column(Text)
     timezone: Mapped[str] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -490,11 +491,28 @@ class DeliveryTask(Record, Base):
 
 class Pilot(Record, Base):
     __tablename__ = "pilot_profiles"
-    __table_args__ = {"schema": "fulfillment"}
+    __table_args__ = (
+        CheckConstraint("max_active_tasks BETWEEN 1 AND 5", name="pilot_task_capacity"),
+        CheckConstraint(
+            "(location_consent_at IS NULL) = (location_consent_version IS NULL)",
+            name="pilot_location_consent_pair",
+        ),
+        CheckConstraint(
+            "state IN ('offline','online_available','offer_pending','assigned',"
+            "'on_break','unavailable','suspended')",
+            name="pilot_state",
+        ),
+        {"schema": "fulfillment"},
+    )
     user_id: Mapped[UUID] = fk("identity.users.id", unique=True)
     city_id: Mapped[UUID] = fk("geo.cities.id", index=True)
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
     available: Mapped[bool] = mapped_column(Boolean, default=False)
+    state: Mapped[str] = mapped_column(Text, default="offline", server_default="offline")
+    max_active_tasks: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    vehicle_type: Mapped[str] = mapped_column(Text, default="bike", server_default="bike")
+    location_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    location_consent_version: Mapped[str | None] = mapped_column(Text)
 
 
 class Assignment(Record, Base):
@@ -521,12 +539,29 @@ class LatestLocation(Record, Base):
             "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180",
             name="location_coordinates",
         ),
+        CheckConstraint("accuracy_m BETWEEN 0 AND 1000", name="location_accuracy"),
+        CheckConstraint(
+            "heading_degrees IS NULL OR heading_degrees BETWEEN 0 AND 360",
+            name="location_heading",
+        ),
+        CheckConstraint("speed_mps IS NULL OR speed_mps BETWEEN 0 AND 100", name="location_speed"),
+        CheckConstraint(
+            "battery_percent IS NULL OR battery_percent BETWEEN 0 AND 100",
+            name="location_battery",
+        ),
+        CheckConstraint("app_state IN ('foreground','background')", name="location_app_state"),
         {"schema": "fulfillment"},
     )
     pilot_id: Mapped[UUID] = fk("fulfillment.pilot_profiles.id", unique=True)
     latitude: Mapped[Decimal] = mapped_column(Numeric(10, 7))
     longitude: Mapped[Decimal] = mapped_column(Numeric(10, 7))
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    accuracy_m: Mapped[Decimal] = mapped_column(Numeric(8, 2), default=0)
+    heading_degrees: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
+    speed_mps: Mapped[Decimal | None] = mapped_column(Numeric(7, 2))
+    client_sequence: Mapped[int] = mapped_column(Integer, default=0)
+    battery_percent: Mapped[int | None] = mapped_column(Integer)
+    app_state: Mapped[str] = mapped_column(Text, default="foreground")
 
 
 class Idempotency(Record, Base):
@@ -673,6 +708,13 @@ class Outbox(Record, Base):
             "available_at",
             postgresql_where=text("delivered_at IS NULL AND dead_lettered_at IS NULL"),
         ),
+        Index(
+            "ix_outbox_claimable",
+            "available_at",
+            "claim_expires_at",
+            "id",
+            postgresql_where=text("delivered_at IS NULL AND dead_lettered_at IS NULL"),
+        ),
         {"schema": "integration"},
     )
     event_type: Mapped[str] = mapped_column(Text)
@@ -684,6 +726,8 @@ class Outbox(Record, Base):
     available_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    claim_token: Mapped[UUID | None] = mapped_column()
+    claim_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     dead_lettered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

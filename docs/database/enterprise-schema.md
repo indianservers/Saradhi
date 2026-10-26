@@ -1,4 +1,4 @@
-# Enterprise schema — Phase 2
+# Enterprise schema â€” Phase 2
 
 247 real tables across identity, geo, merchant, catalog, inventory, commerce, fulfillment,
 finance, engagement, operations, intelligence, integration and audit. These schemas are
@@ -28,14 +28,14 @@ statuses, expected versions, row locks and state histories.
 
 Migrations are the sole authority: 20261026_0001 enterprise DDL/guards; 0002 permission masters;
 0003 separate refund approvals and ledger identity guards; 0004 FEFO allocations/batch movements;
-0005 history/retention indexes. The initial revision contains a frozen JSON DDL snapshot and
+0005 history/retention indexes; 0006 seven-decimal GPS history and city/province consistency. The initial revision contains a frozen JSON DDL snapshot and
 0004 contains a frozen table SQL artifact. Runtime metadata.create_all is never used.
 Downgrades deliberately refuse destructive removal; use reviewed forward repair or restore.
-Alembic check reports no model/schema differences after all five revisions.
+Alembic check reports no model/schema differences after all six revisions.
 
-The database has 793 constraints (792 ordinary ORM constraints plus one deferred ledger
+The database has 795 constraints (794 ordinary ORM constraints plus one deferred ledger
 constraint trigger), 694 indexes including PK/unique backing indexes (345 explicitly modeled
-indexes), and 57 user triggers. No table is prematurely partitioned. All FKs use RESTRICT;
+indexes), and 58 user triggers. No table is prematurely partitioned. All FKs use RESTRICT;
 retention explicitly targets ephemeral records without cascading financial deletion.
 
 PostGIS is absent from this distribution. No extension was silently installed and no radius

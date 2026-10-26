@@ -1,1 +1,1 @@
-"""Fulfillment bounded context. See docs/architecture/module-boundaries.md."""
+"""Delivery ETA and fulfilment planning services."""

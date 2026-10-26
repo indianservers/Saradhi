@@ -1,0 +1,7 @@
+# Merchant onboarding workflow
+
+The app supports account registration/login, organization creation (when needed), brand creation, city selection and branch submission. One `POST /merchant/onboarding` transaction creates the organization (with owner membership/role, when new), brand and branch, avoiding duplicate partial organizations if the request fails. A branch is created in `pending` status and must be reviewed by an authorized administrator; the app cannot approve or activate itself. Reusing an authorized organization allows an owner to add branches without duplicating the organization.
+
+The current backend schema is far narrower than the requested full KYC flow. It does not provide secure document upload, contact/mobile, operating street address, tax/FSSAI fields, payout account capture, branch photos/logo/banner, operating-hours checklist, document verification state or `MORE_INFORMATION_REQUIRED` review interaction. The app warns about these omissions and does not collect bank/document secrets in an improvised form.
+
+Validation in the client covers required fields and numeric coordinate syntax; backend Pydantic validation enforces coordinate ranges and authorization. City data is loaded from the shared geography API. If no active city exists, branch submission remains unavailable. Test the full onboarding flow only after adding a backend KYC/upload contract and the Flutter runtime.

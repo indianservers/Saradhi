@@ -69,8 +69,6 @@ def generate(freeze=False):
         "",
         "Machine-readable complete relationships: schema.json.",
         "",
-        "```mermaid",
-        "erDiagram",
     ]
     for table in tables:
         item = {
@@ -129,14 +127,21 @@ def generate(freeze=False):
             "",
         ]
         dictionary["tables"].append(item)
-        for fk in sorted(table.foreign_key_constraints, key=lambda fk: str(fk.name)):
-            source = fk.referred_table.fullname.replace(".", "_")
-            destination = table.fullname.replace(".", "_")
-            erd.append(f'  {source} ||--o{{ {destination} : "{fk.name}"')
+    for schema in sorted({table.schema for table in tables}):
+        erd += [f"## {schema}", "", "```mermaid", "erDiagram"]
+        for table in tables:
+            if table.schema != schema:
+                continue
+            erd.append(f"  {table.fullname.replace('.', '_')} {{ uuid id PK }}")
+            for fk in sorted(table.foreign_key_constraints, key=lambda fk: str(fk.name)):
+                source = fk.referred_table.fullname.replace(".", "_")
+                destination = table.fullname.replace(".", "_")
+                erd.append(f'  {source} ||--o{{ {destination} : "{fk.name}"')
+        erd += ["```", ""]
     erd += [
-        "```",
-        "",
-        "Diagram and dictionary describe implemented DDL, not evidence of applied migrations.",
+        "Each diagram groups child tables by namespace; external parents retain their schema prefix.",
+        "Columns and nullability are fully specified in the dictionary and machine schema.",
+        "Actual applied-migration/catalog evidence is in ../operations/phase-2-database-evidence.json.",
     ]
     md += [
         "## Database-only invariants",
@@ -144,7 +149,8 @@ def generate(freeze=False):
         "The deferred `finance.require_balanced_journal` constraint trigger "
         "is included in the total "
         "database constraint count in addition to ordinary ORM constraints. Full guard definitions "
-        "are frozen in Alembic revisions 0001 and 0003. There are 57 user triggers, including "
+        "are frozen in the Alembic revision history. "
+        f"There are {dictionary['trigger_count']} user triggers, including "
         "posted-journal/line immutability, currency balance, scope, refund approval "
         "and append-only records.",
         "",

@@ -60,6 +60,21 @@ async def scoped(session, actor, permission, organization_id=None, city_id=None,
     for assignment, role in (await session.execute(query)).all():
         if role == "platform_super_admin" and assignment.organization_id is None:
             return
+        if (
+            organization_id is None
+            and city_id is not None
+            and assignment.organization_id is None
+            and assignment.city_id == city_id
+            and assignment.branch_id is None
+        ):
+            return
+        if (
+            role == "city_manager"
+            and assignment.city_id == city_id
+            and assignment.branch_id is None
+            and (organization_id is None or assignment.organization_id == organization_id)
+        ):
+            return
         if organization_id is None or assignment.organization_id != organization_id:
             continue
         membership = await session.scalar(

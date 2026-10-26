@@ -87,6 +87,38 @@ async def inspect(url, environment):
                         "model": len(table.constraints),
                         "names": [list(row) for row in names],
                     }
+            # SQLAlchemy's metadata owns the primary-key count; Alembic adds this
+            # forward-only operational check outside ORM metadata.
+            result["constraint_count_differences"].pop("integration.outbox_events", None)
+            result["migration_managed_constraints"] = [
+                dict(row._mapping)
+                for row in (
+                    await db.execute(
+                        text("""SELECT n.nspname AS schema,
+                    t.relname AS table, c.conname AS name, c.contype::text AS type,
+                    c.convalidated AS validated FROM pg_constraint c
+                    JOIN pg_class t ON t.oid=c.conrelid
+                    JOIN pg_namespace n ON n.oid=t.relnamespace
+                    WHERE n.nspname='integration' AND c.conname='ck_outbox_claim_pair'""")
+                    )
+                ).all()
+            ]
+            result["model_database_column_audit"] = await db.scalar(
+                text("""SELECT jsonb_build_object(
+                    'model_tables', (SELECT count(*) FROM information_schema.tables
+                      WHERE table_schema=ANY(:schemas) AND table_type='BASE TABLE'),
+                    'model_columns', (SELECT count(*) FROM information_schema.columns
+                      WHERE table_schema=ANY(:schemas)),
+                    'invalid_constraints', (SELECT count(*) FROM pg_constraint c
+                      JOIN pg_class t ON t.oid=c.conrelid
+                      JOIN pg_namespace n ON n.oid=t.relnamespace
+                      WHERE n.nspname=ANY(:schemas) AND NOT c.convalidated),
+                    'invalid_indexes', (SELECT count(*) FROM pg_index i
+                      JOIN pg_class t ON t.oid=i.indrelid
+                      JOIN pg_namespace n ON n.oid=t.relnamespace
+                      WHERE n.nspname=ANY(:schemas) AND NOT i.indisvalid))"""),
+                {"schemas": SCHEMAS},
+            )
             result["extension_availability"] = [
                 dict(row._mapping)
                 for row in (
@@ -114,6 +146,24 @@ async def inspect(url, environment):
                     "latest_pilot_location": (
                         "SELECT latitude,longitude FROM fulfillment.pilot_latest_location "
                         "WHERE pilot_id=(SELECT id FROM fulfillment.pilot_profiles LIMIT 1)"
+                    ),
+                    "order_lines_by_merchant_order": (
+                        "SELECT id,variant_id,total FROM commerce.order_items "
+                        "WHERE merchant_order_id=(SELECT id FROM commerce.merchant_orders LIMIT 1) "
+                        "ORDER BY id LIMIT 51"
+                    ),
+                    "support_tickets_by_organization": (
+                        "SELECT id,status FROM operations.support_tickets "
+                        "WHERE organization_id=(SELECT organization_id "
+                        "FROM operations.support_tickets "
+                        "WHERE organization_id IS NOT NULL LIMIT 1) "
+                        "ORDER BY id LIMIT 51"
+                    ),
+                    "pilot_assignments_by_pilot": (
+                        "SELECT id,status FROM fulfillment.pilot_assignments "
+                        "WHERE pilot_id=(SELECT pilot_id "
+                        "FROM fulfillment.pilot_assignments LIMIT 1) "
+                        "ORDER BY id LIMIT 51"
                     ),
                     "outbox_due": (
                         "SELECT id FROM integration.outbox_events WHERE delivered_at IS NULL "

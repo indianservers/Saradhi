@@ -1,0 +1,3 @@
+# Phase 2.B database migrations
+
+Migrations `20261026_0008_logistics_runtime` and `20261026_0009_location_consent` extend existing fulfillment/pilot tables and add tracking ticket, dispatch policy, ETA estimate and append-only pilot location consent records. No duplicate delivery-task or assignment tables were introduced. Both local `quickbuddy_test` and `quickbuddy_dev` were migrated through `20261026_0009`. The post-0009 schema audit reports 251 tables and 1,708 model/database columns for each database, with no missing/extra tables or columns, timezone mismatches or invalid constraints. PostGIS extension is absent in the local PostgreSQL build, so spatial serviceability queries are not claimed.

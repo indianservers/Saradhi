@@ -60,6 +60,7 @@ def define(schema, name, fields, *, unique=(), checks=(), immutable=False):
                 "bool": Boolean,
                 "amount": Numeric(20, 4),
                 "quantity": Numeric(20, 4),
+                "coordinate": Numeric(10, 7),
                 "json": JSONB,
                 "date": Date,
                 "time": Time,
@@ -193,8 +194,8 @@ def register():
         "geo_locations",
         {
             "address_id": "geo.addresses",
-            "latitude": "quantity",
-            "longitude": "quantity",
+            "latitude": "coordinate",
+            "longitude": "coordinate",
             "source": "text",
         },
         checks=["latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180"],
@@ -948,10 +949,43 @@ def register():
         },
         "pilot_location_events": {
             "pilot_id": "fulfillment.pilot_profiles",
-            "latitude": "quantity",
-            "longitude": "quantity",
+            "latitude": "coordinate",
+            "longitude": "coordinate",
             "observed_at": "timestamp",
+            "accuracy_m": "amount",
+            "heading_degrees": "amount?",
+            "speed_mps": "amount?",
+            "client_sequence": "int",
+            "battery_percent": "int?",
+            "app_state": "text",
             "expires_at": "timestamp",
+        },
+        "pilot_location_consents": {
+            "pilot_id": "fulfillment.pilot_profiles",
+            "policy_version": "text",
+            "accepted": "bool",
+        },
+        "tracking_ws_tickets": {
+            "user_id": "identity.users",
+            "token_hash": "text",
+            "expires_at": "timestamp",
+            "consumed_at": "timestamp?",
+        },
+        "dispatch_policies": {
+            "city_id": "geo.cities",
+            "version": "int",
+            "weights": "json",
+            "active": "bool",
+        },
+        "eta_estimates": {
+            "task_id": "fulfillment.delivery_tasks",
+            "generated_at": "timestamp",
+            "pickup_at": "timestamp?",
+            "delivery_at": "timestamp",
+            "source": "text",
+            "confidence": "text",
+            "rule_version": "text",
+            "reason": "text",
         },
         "delivery_task_items": {
             "task_id": "fulfillment.delivery_tasks",
@@ -1042,9 +1076,20 @@ def register():
             "fulfillment",
             name,
             fields,
+            unique=(
+                [("token_hash",)]
+                if name == "tracking_ws_tickets"
+                else [("city_id", "version")]
+                if name == "dispatch_policies"
+                else []
+            ),
+            checks=["latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180"]
+            if name == "pilot_location_events"
+            else [],
             immutable=name
             in {
                 "pilot_status_history",
+                "pilot_location_consents",
                 "pickup_confirmations",
                 "delivery_confirmations",
                 "dispatch_events",
@@ -1403,6 +1448,15 @@ def register():
             "version": "text",
             "artifact_reference": "text",
             "approved_by": "identity.users?",
+            "algorithm": "text",
+            "training_code_version": "text",
+            "dataset_reference": "text?",
+            "feature_schema_version": "text",
+            "trained_at": "timestamp?",
+            "metrics": "json",
+            "artifact_checksum": "text?",
+            "validation_passed": "bool",
+            "status": "text",
         },
         "ai_inference_runs": {
             "version_id": "intelligence.ai_model_versions",
@@ -1470,6 +1524,69 @@ def register():
             fields,
             immutable=name in {"ai_agent_tool_calls", "ai_agent_action_approvals"},
         )
+    d(
+        "intelligence",
+        "ai_training_jobs",
+        {
+            "model_id": "intelligence.ai_model_registry",
+            "status": "text",
+            "dataset_reference": "text",
+            "sample_count": "int",
+            "code_version": "text",
+            "feature_schema_version": "text",
+            "metrics": "json",
+            "started_at": "timestamp?",
+            "finished_at": "timestamp?",
+            "error_code": "text?",
+        },
+        checks=[
+            "sample_count >= 0",
+            "status IN ('queued','running','succeeded','failed','cancelled')",
+            "(started_at IS NULL) = (status = 'queued')",
+        ],
+    )
+    d(
+        "intelligence",
+        "ai_feature_pipeline_runs",
+        {
+            "feature_schema_version": "text",
+            "source_cutoff": "timestamp",
+            "row_count": "int",
+            "quality": "json",
+            "status": "text",
+        },
+        checks=["row_count >= 0", "status IN ('succeeded','failed','partial')"],
+    )
+    d(
+        "intelligence",
+        "ai_forecast_outputs",
+        {
+            "city_id": "geo.cities",
+            "zone_id": "geo.service_zones?",
+            "interval_minutes": "int",
+            "forecast": "json",
+            "provenance": "text",
+            "feature_schema_version": "text",
+            "source_cutoff": "timestamp",
+            "expires_at": "timestamp",
+        },
+        checks=["interval_minutes > 0"],
+    )
+    d(
+        "intelligence",
+        "ai_optimization_decisions",
+        {
+            "city_id": "geo.cities",
+            "mode": "text",
+            "policy_version": "text",
+            "objective_score": "amount",
+            "plan": "json",
+            "constraint_checks": "json",
+            "runtime_ms": "int",
+            "fallback_reason": "text?",
+        },
+        checks=["runtime_ms >= 0"],
+    )
     for name, fields in {
         "integration_connections": {
             "organization_id": "identity.organizations",

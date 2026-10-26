@@ -1,16 +1,7 @@
-import { Shell } from "@quickbuddy/web-design-system";
+import { AdminControlTower } from "@quickbuddy/web-design-system";
+import { redirect } from "next/navigation";
+
 export default function Page() {
-  return (
-    <Shell
-      title="Control center"
-      eyebrow="Company administration"
-      modules={[
-        "Merchants",
-        "Customers & pilots",
-        "Cities & categories",
-        "Finance",
-        "AI operations",
-      ]}
-    />
-  );
+  if (process.env.NODE_ENV === "production") redirect("/workspace");
+  return <AdminControlTower />;
 }

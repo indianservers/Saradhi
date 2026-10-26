@@ -78,6 +78,7 @@ class CountryOut(NamedOut):
 
 class CityIn(NameIn):
     country_id: UUID
+    state_province_id: UUID | None = None
     timezone: str
 
     @field_validator("timezone")
@@ -128,18 +129,35 @@ class BranchIn(NameIn):
     longitude: Decimal = Field(ge=-180, le=180, max_digits=10, decimal_places=7)
 
 
+class MerchantOnboardingIn(Input):
+    organization_id: UUID | None = None
+    organization_name: Name | None = None
+    brand_name: Name
+    merchant_type: Literal["food", "grocery", "retail", "pharmacy", "parcel"]
+    branch_name: Name
+    city_id: UUID
+    latitude: Decimal = Field(ge=-90, le=90, max_digits=10, decimal_places=7)
+    longitude: Decimal = Field(ge=-180, le=180, max_digits=10, decimal_places=7)
+
+
 class BranchOut(VersionOut):
     name: str
     organization_id: UUID
     brand_id: UUID
     city_id: UUID
     accepting_orders: bool
+    merchant_type: Literal["food", "grocery", "retail", "pharmacy", "parcel"] | None = None
 
 
 class BranchReviewIn(Input):
     decision: Literal["approved", "rejected"]
     expected_version: int = Field(ge=1)
     reason: str = Field(min_length=5, max_length=500)
+
+
+class BranchAvailabilityIn(Input):
+    accepting_orders: bool
+    expected_version: int = Field(ge=1)
 
 
 class HoursIn(Input):
@@ -206,6 +224,24 @@ class PriceOut(IdOut):
     ends_at: datetime | None
 
 
+class CatalogProductOut(IdOut):
+    product_id: UUID
+    variant_id: UUID
+    branch_id: UUID
+    branch_name: str
+    merchant_type: Literal["food", "grocery", "retail", "pharmacy", "parcel"]
+    category_id: UUID
+    category_name: str
+    name: str
+    variant_name: str
+    unit: str
+    variable_weight: bool
+    currency: str
+    unit_price: Decimal
+    available_quantity: Decimal
+    serviceable: bool | None = None
+
+
 class WindowIn(Input):
     starts_at: datetime
     ends_at: datetime
@@ -267,6 +303,28 @@ class CartItemOut(IdOut):
     address_id: UUID | None
     window_id: UUID
     delivery_method: str
+    product_name: str | None = None
+    variant_name: str | None = None
+    branch_name: str | None = None
+    window_starts_at: datetime | None = None
+    window_ends_at: datetime | None = None
+
+
+class QuoteLineOut(BaseModel):
+    product_name: str
+    variant_name: str
+    branch_id: UUID
+    quantity: Decimal
+    unit: str
+    unit_price: Decimal
+    currency: str
+    total: Decimal
+    window_id: UUID
+    delivery_method: str
+    branch_name: str | None = None
+    window_starts_at: datetime | None = None
+    window_ends_at: datetime | None = None
+    delivery_address: str | None = None
 
 
 class QuoteOut(IdOut):
@@ -274,6 +332,7 @@ class QuoteOut(IdOut):
     currency: str
     total: Decimal
     expires_at: datetime
+    lines: list[QuoteLineOut] = Field(default_factory=list)
 
 
 class ConfirmIn(Input):
@@ -290,6 +349,50 @@ class ChildOut(OrderOut):
     branch_id: UUID
 
 
+class MerchantQueueItem(BaseModel):
+    product_name: str
+    variant_name: str
+    quantity: Decimal
+    unit: str
+    unit_price: Decimal
+    total: Decimal
+
+
+class MerchantQueueOut(ChildOut):
+    created_at: datetime
+    items: list[MerchantQueueItem] = Field(default_factory=list)
+
+
+class MerchantQueuePage(BaseModel):
+    items: list[MerchantQueueOut]
+    next_cursor: str | None = None
+
+
+class MerchantCatalogOut(BaseModel):
+    product_id: UUID
+    variant_id: UUID
+    name: str
+    variant_name: str
+    sku: str
+    unit: str
+    active: bool
+    currency: str | None = None
+    unit_price: Decimal | None = None
+    on_hand: Decimal = Decimal("0")
+    reserved: Decimal = Decimal("0")
+
+
+class ReorderLineOut(BaseModel):
+    branch_id: UUID
+    branch_name: str
+    variant_id: UUID
+    product_name: str
+    variant_name: str
+    quantity: Decimal
+    delivery_method: str
+    address_id: UUID | None = None
+
+
 class TransitionIn(Input):
     target: Literal["accepted", "rejected", "preparing", "ready", "cancelled"]
     expected_version: int = Field(ge=1)
@@ -301,6 +404,52 @@ class VersionIn(Input):
 
 class OfferIn(Input):
     pilot_id: UUID | None = None
+
+
+class ReassignmentIn(Input):
+    pilot_id: UUID
+    reason: str = Field(min_length=5, max_length=500)
+
+
+class DispatchPolicyIn(Input):
+    weights: dict[str, Decimal] = Field(min_length=2, max_length=2)
+
+    @field_validator("weights")
+    @classmethod
+    def valid_weights(cls, value):
+        if set(value) != {"pickup_distance", "workload"}:
+            raise ValueError("Only pickup_distance and workload scoring weights are supported")
+        if any(not weight.is_finite() or weight < 0 or weight > 100 for weight in value.values()):
+            raise ValueError("Dispatch weights must be finite values between zero and 100")
+        return value
+
+
+class PreparationPredictIn(Input):
+    branch_id: UUID
+    item_count: int = Field(ge=1, le=100)
+
+
+class EtaPredictIn(Input):
+    task_id: UUID
+
+
+class DispatchOptimizeIn(Input):
+    city_id: UUID
+    task_ids: list[UUID] = Field(min_length=1, max_length=50)
+
+
+class RecommendationQueryIn(Input):
+    city_id: UUID
+    category_id: UUID | None = None
+    limit: int = Field(default=10, ge=1, le=30)
+
+
+class CopilotQueryIn(Input):
+    question: str = Field(min_length=1, max_length=2000)
+
+
+class AiEvaluateIn(Input):
+    city_id: UUID
 
 
 class AssignmentOut(StateOut):
@@ -321,6 +470,28 @@ class LocationIn(Input):
     latitude: Decimal = Field(ge=-90, le=90, max_digits=10, decimal_places=7)
     longitude: Decimal = Field(ge=-180, le=180, max_digits=10, decimal_places=7)
     observed_at: datetime
+    accuracy_m: Decimal = Field(ge=0, le=1000, max_digits=8, decimal_places=2)
+    heading_degrees: Decimal | None = Field(
+        default=None, ge=0, le=360, max_digits=6, decimal_places=2
+    )
+    speed_mps: Decimal | None = Field(default=None, ge=0, le=100, max_digits=7, decimal_places=2)
+    client_sequence: int = Field(ge=0)
+    battery_percent: int | None = Field(default=None, ge=0, le=100)
+    app_state: Literal["foreground", "background"] = "foreground"
+
+
+class PilotAvailabilityIn(Input):
+    state: Literal["online_available", "on_break", "unavailable", "offline"]
+
+
+class LocationConsentIn(Input):
+    accepted: bool
+    policy_version: str = Field(min_length=1, max_length=40, pattern=r"^[A-Za-z0-9._-]+$")
+
+
+class TrackingTicketOut(Output):
+    ticket: str
+    expires_at: datetime
 
 
 class CurrencyIn(Input):

@@ -1,0 +1,5 @@
+# Dispatch engine
+
+Dispatch operates on `delivery_tasks`, never the parent checkout. A candidate must be verified, explicitly available, in the task city, have a fresh persisted location and have active-task capacity. Merchant-delivery tasks are restricted to merchant members. Suspended pilots are excluded. The strategy is deterministic and replaceable; current scoring combines straight-line pickup proximity (ranking only) and active workload with versioned city weights. It does not establish geographic serviceability, vehicle fit, route compatibility, lateness risk or road travel time.
+
+Offers expire after 60 seconds. Task and pilot row locks, conditional assignment state, a partial unique active-assignment constraint, and bounded `SKIP LOCKED` expiration protect transitions across workers. Accept, reject, expiry, manual reassignment and their attribution are recorded. The worker retries expiry; automatic spatial candidate dispatch and replacement offers are not enabled because PostGIS and a durable Redis worker runtime are unavailable in this environment.

@@ -40,3 +40,12 @@ UTC occurred_at, version, correlation and minimal payload. TransactionalOutbox.a
 use the same PostgreSQL transaction as the state update. Consumers atomically commit effects
 with unique event IDs; retry with bounded exponential backoff/jitter, durable dead-letter
 storage and manual replay. Interfaces exist; reliability is not implemented or claimed.
+
+## Phase 2 implementation layout
+
+The reserved context packages remain ownership markers. Implemented pure invariants live in backend/domain;
+application services are split into identity, commerce, batches, logistics, finance, events and maintenance.
+backend/persistence contains the shared ORM registry and repositories, needed to order cross-schema FKs.
+backend/api/v1 contains typed transports and dependencies. Domain code imports neither FastAPI nor ORM.
+There are no circular application/context imports. Split physical context packages further as services grow;
+do not duplicate models or move transaction ownership into individual frontend applications.

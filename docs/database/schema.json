@@ -972,6 +972,22 @@
           "server_default": "now()"
         },
         {
+          "name": "claim_token",
+          "type": "UUID",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "claim_expires_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
           "name": "delivered_at",
           "type": "TIMESTAMP WITH TIME ZONE",
           "nullable": true,
@@ -1023,6 +1039,16 @@
         }
       ],
       "indexes": [
+        {
+          "name": "ix_outbox_claimable",
+          "columns": [
+            "available_at",
+            "claim_expires_at",
+            "id"
+          ],
+          "unique": false,
+          "predicate": "delivered_at IS NULL AND dead_lettered_at IS NULL"
+        },
         {
           "name": "ix_outbox_pending",
           "columns": [
@@ -1089,6 +1115,99 @@
       "constraints": [
         {
           "name": "pk_ai_feature_definitions",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "schema": "intelligence",
+      "name": "ai_feature_pipeline_runs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "feature_schema_version",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "source_cutoff",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "row_count",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "quality",
+          "type": "JSONB",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_ai_feature_pipeline_runs_rule_0",
+          "type": "CheckConstraint",
+          "sql": "row_count >= 0",
+          "columns": []
+        },
+        {
+          "name": "ck_ai_feature_pipeline_runs_rule_1",
+          "type": "CheckConstraint",
+          "sql": "status IN ('succeeded','failed','partial')",
+          "columns": []
+        },
+        {
+          "name": "pk_ai_feature_pipeline_runs",
           "type": "PrimaryKeyConstraint",
           "sql": null,
           "columns": [
@@ -2339,46 +2458,9 @@
       ]
     },
     {
-      "schema": "geo",
-      "name": "cities",
+      "schema": "fulfillment",
+      "name": "tracking_ws_tickets",
       "columns": [
-        {
-          "name": "country_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.countries.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "name",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "timezone",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "active",
-          "type": "BOOLEAN",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
         {
           "name": "id",
           "type": "UUID",
@@ -2402,19 +2484,56 @@
           "primary_key": false,
           "foreign_keys": [],
           "server_default": "now()"
+        },
+        {
+          "name": "user_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "identity.users.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "expires_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "consumed_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
         }
       ],
       "constraints": [
         {
-          "name": "fk_cities_country_id_countries",
+          "name": "fk_tracking_ws_tickets_user_id_users",
           "type": "ForeignKeyConstraint",
           "sql": null,
           "columns": [
-            "country_id"
+            "user_id"
           ]
         },
         {
-          "name": "pk_cities",
+          "name": "pk_tracking_ws_tickets",
           "type": "PrimaryKeyConstraint",
           "sql": null,
           "columns": [
@@ -2422,16 +2541,24 @@
           ]
         },
         {
-          "name": "uq_cities_country_id",
+          "name": "uq_tracking_ws_tickets_token_hash",
           "type": "UniqueConstraint",
           "sql": null,
           "columns": [
-            "country_id",
-            "name"
+            "token_hash"
           ]
         }
       ],
-      "indexes": []
+      "indexes": [
+        {
+          "name": "ix_tracking_ws_tickets_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
     },
     {
       "schema": "geo",
@@ -3836,6 +3963,78 @@
             }
           ],
           "server_default": null
+        },
+        {
+          "name": "algorithm",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "training_code_version",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "dataset_reference",
+          "type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "feature_schema_version",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "trained_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "metrics",
+          "type": "JSONB",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "artifact_checksum",
+          "type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "validation_passed",
+          "type": "BOOLEAN",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
         }
       ],
       "constraints": [
@@ -3875,6 +4074,167 @@
         },
         {
           "name": "ix_ai_model_versions_model_id",
+          "columns": [
+            "model_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "intelligence",
+      "name": "ai_training_jobs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "model_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "intelligence.ai_model_registry.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "dataset_reference",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "sample_count",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "code_version",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "feature_schema_version",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "metrics",
+          "type": "JSONB",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "started_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "finished_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "error_code",
+          "type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_ai_training_jobs_rule_0",
+          "type": "CheckConstraint",
+          "sql": "sample_count >= 0",
+          "columns": []
+        },
+        {
+          "name": "ck_ai_training_jobs_rule_1",
+          "type": "CheckConstraint",
+          "sql": "status IN ('queued','running','succeeded','failed','cancelled')",
+          "columns": []
+        },
+        {
+          "name": "ck_ai_training_jobs_rule_2",
+          "type": "CheckConstraint",
+          "sql": "(started_at IS NULL) = (status = 'queued')",
+          "columns": []
+        },
+        {
+          "name": "fk_ai_training_jobs_model_id_ai_model_registry",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "model_id"
+          ]
+        },
+        {
+          "name": "pk_ai_training_jobs",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_ai_training_jobs_model_id",
           "columns": [
             "model_id"
           ],
@@ -5839,130 +6199,6 @@
     },
     {
       "schema": "finance",
-      "name": "fee_rules",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "city_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.cities.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "currency_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "finance.currencies.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "name",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "amount",
-          "type": "NUMERIC(20, 4)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "starts_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_fee_rules_city_id_cities",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "city_id"
-          ]
-        },
-        {
-          "name": "fk_fee_rules_currency_id_currencies",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "currency_id"
-          ]
-        },
-        {
-          "name": "pk_fee_rules",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_fee_rules_city_id",
-          "columns": [
-            "city_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        },
-        {
-          "name": "ix_fee_rules_currency_id",
-          "columns": [
-            "currency_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "finance",
       "name": "ledger_posting_batches",
       "columns": [
         {
@@ -6306,246 +6542,6 @@
       ]
     },
     {
-      "schema": "finance",
-      "name": "tax_rules",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "tax_code_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "finance.tax_codes.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "city_id",
-          "type": "UUID",
-          "nullable": true,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.cities.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "rate",
-          "type": "NUMERIC(20, 4)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "starts_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "ends_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": true,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_tax_rules_city_id_cities",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "city_id"
-          ]
-        },
-        {
-          "name": "fk_tax_rules_tax_code_id_tax_codes",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "tax_code_id"
-          ]
-        },
-        {
-          "name": "pk_tax_rules",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_tax_rules_city_id",
-          "columns": [
-            "city_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        },
-        {
-          "name": "ix_tax_rules_tax_code_id",
-          "columns": [
-            "tax_code_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_profiles",
-      "columns": [
-        {
-          "name": "user_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "identity.users.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "city_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.cities.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "verified",
-          "type": "BOOLEAN",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "available",
-          "type": "BOOLEAN",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_pilot_profiles_city_id_cities",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "city_id"
-          ]
-        },
-        {
-          "name": "fk_pilot_profiles_user_id_users",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "user_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_profiles",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        },
-        {
-          "name": "uq_pilot_profiles_user_id",
-          "type": "UniqueConstraint",
-          "sql": null,
-          "columns": [
-            "user_id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_pilot_profiles_city_id",
-          "columns": [
-            "city_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
       "schema": "fulfillment",
       "name": "recurrence_exceptions",
       "columns": [
@@ -6760,170 +6756,29 @@
     },
     {
       "schema": "geo",
-      "name": "addresses",
+      "name": "cities",
       "columns": [
         {
-          "name": "user_id",
+          "name": "country_id",
           "type": "UUID",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [
             {
-              "target": "identity.users.id",
+              "target": "geo.countries.id",
               "on_delete": "RESTRICT"
             }
           ],
           "server_default": null
         },
         {
-          "name": "city_id",
+          "name": "state_province_id",
           "type": "UUID",
-          "nullable": false,
+          "nullable": true,
           "primary_key": false,
           "foreign_keys": [
             {
-              "target": "geo.cities.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "label",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "address_text",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "latitude",
-          "type": "NUMERIC(10, 7)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "longitude",
-          "type": "NUMERIC(10, 7)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "ck_addresses_coordinates",
-          "type": "CheckConstraint",
-          "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180",
-          "columns": []
-        },
-        {
-          "name": "fk_addresses_city_id_cities",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "city_id"
-          ]
-        },
-        {
-          "name": "fk_addresses_user_id_users",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "user_id"
-          ]
-        },
-        {
-          "name": "pk_addresses",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_addresses_user_id",
-          "columns": [
-            "user_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "geo",
-      "name": "operating_calendars",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "city_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.cities.id",
+              "target": "geo.states_provinces.id",
               "on_delete": "RESTRICT"
             }
           ],
@@ -6939,149 +6794,6 @@
         },
         {
           "name": "timezone",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_operating_calendars_city_id_cities",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "city_id"
-          ]
-        },
-        {
-          "name": "pk_operating_calendars",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_operating_calendars_city_id",
-          "columns": [
-            "city_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "geo",
-      "name": "postal_codes",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "city_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.cities.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "code",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_postal_codes_city_id_cities",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "city_id"
-          ]
-        },
-        {
-          "name": "pk_postal_codes",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        },
-        {
-          "name": "uq_postal_codes_city_id",
-          "type": "UniqueConstraint",
-          "sql": null,
-          "columns": [
-            "city_id",
-            "code"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_postal_codes_city_id",
-          "columns": [
-            "city_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "geo",
-      "name": "service_zones",
-      "columns": [
-        {
-          "name": "city_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.cities.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "name",
           "type": "TEXT",
           "nullable": false,
           "primary_key": false,
@@ -7123,15 +6835,23 @@
       ],
       "constraints": [
         {
-          "name": "fk_service_zones_city_id_cities",
+          "name": "fk_cities_country_id_countries",
           "type": "ForeignKeyConstraint",
           "sql": null,
           "columns": [
-            "city_id"
+            "country_id"
           ]
         },
         {
-          "name": "pk_service_zones",
+          "name": "fk_cities_state_province_id_states_provinces",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "state_province_id"
+          ]
+        },
+        {
+          "name": "pk_cities",
           "type": "PrimaryKeyConstraint",
           "sql": null,
           "columns": [
@@ -7139,25 +6859,16 @@
           ]
         },
         {
-          "name": "uq_service_zones_city_id",
+          "name": "uq_cities_country_id",
           "type": "UniqueConstraint",
           "sql": null,
           "columns": [
-            "city_id",
+            "country_id",
             "name"
           ]
         }
       ],
-      "indexes": [
-        {
-          "name": "ix_service_zones_city_id",
-          "columns": [
-            "city_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
+      "indexes": []
     },
     {
       "schema": "identity",
@@ -8744,101 +8455,6 @@
       ]
     },
     {
-      "schema": "operations",
-      "name": "operational_incidents",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "city_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.cities.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "severity",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "summary",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "status",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_operational_incidents_city_id_cities",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "city_id"
-          ]
-        },
-        {
-          "name": "pk_operational_incidents",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_operational_incidents_city_id",
-          "columns": [
-            "city_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
       "schema": "catalog",
       "name": "dietary_attributes",
       "columns": [
@@ -10334,6 +9950,130 @@
     },
     {
       "schema": "finance",
+      "name": "fee_rules",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "city_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.cities.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "currency_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "finance.currencies.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "amount",
+          "type": "NUMERIC(20, 4)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "starts_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_fee_rules_city_id_cities",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "city_id"
+          ]
+        },
+        {
+          "name": "fk_fee_rules_currency_id_currencies",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "currency_id"
+          ]
+        },
+        {
+          "name": "pk_fee_rules",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_fee_rules_city_id",
+          "columns": [
+            "city_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        },
+        {
+          "name": "ix_fee_rules_currency_id",
+          "columns": [
+            "currency_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "finance",
       "name": "ledger_books",
       "columns": [
         {
@@ -10568,8 +10308,8 @@
       ]
     },
     {
-      "schema": "fulfillment",
-      "name": "delivery_routes",
+      "schema": "finance",
+      "name": "tax_rules",
       "columns": [
         {
           "name": "id",
@@ -10596,802 +10336,37 @@
           "server_default": "now()"
         },
         {
-          "name": "pilot_id",
+          "name": "tax_code_id",
           "type": "UUID",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [
             {
-              "target": "fulfillment.pilot_profiles.id",
+              "target": "finance.tax_codes.id",
               "on_delete": "RESTRICT"
             }
           ],
           "server_default": null
         },
         {
-          "name": "status",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_delivery_routes_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "pk_delivery_routes",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_delivery_routes_pilot_id",
-          "columns": [
-            "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_availability",
-      "columns": [
-        {
-          "name": "id",
+          "name": "city_id",
           "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "pilot_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "fulfillment.pilot_profiles.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "available",
-          "type": "BOOLEAN",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "changed_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_pilot_availability_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_availability",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_pilot_availability_pilot_id",
-          "columns": [
-            "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_capabilities",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "pilot_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "fulfillment.pilot_profiles.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "capability",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "expires_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
           "nullable": true,
           "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_pilot_capabilities_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_capabilities",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_pilot_capabilities_pilot_id",
-          "columns": [
-            "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_documents",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "pilot_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
           "foreign_keys": [
             {
-              "target": "fulfillment.pilot_profiles.id",
+              "target": "geo.cities.id",
               "on_delete": "RESTRICT"
             }
           ],
           "server_default": null
         },
         {
-          "name": "document_type",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "private_object_key",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "expires_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": true,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_pilot_documents_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_documents",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_pilot_documents_pilot_id",
-          "columns": [
-            "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_incentives",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "pilot_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "fulfillment.pilot_profiles.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "currency_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "finance.currencies.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "amount",
+          "name": "rate",
           "type": "NUMERIC(20, 4)",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "policy_reference",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_pilot_incentives_currency_id_currencies",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "currency_id"
-          ]
-        },
-        {
-          "name": "fk_pilot_incentives_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_incentives",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_pilot_incentives_currency_id",
-          "columns": [
-            "currency_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        },
-        {
-          "name": "ix_pilot_incentives_pilot_id",
-          "columns": [
-            "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_latest_location",
-      "columns": [
-        {
-          "name": "pilot_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "fulfillment.pilot_profiles.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "latitude",
-          "type": "NUMERIC(10, 7)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "longitude",
-          "type": "NUMERIC(10, 7)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "observed_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "ck_pilot_latest_location_location_coordinates",
-          "type": "CheckConstraint",
-          "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180",
-          "columns": []
-        },
-        {
-          "name": "fk_pilot_latest_location_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_latest_location",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        },
-        {
-          "name": "uq_pilot_latest_location_pilot_id",
-          "type": "UniqueConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        }
-      ],
-      "indexes": []
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_location_events",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "pilot_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "fulfillment.pilot_profiles.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "latitude",
-          "type": "NUMERIC(20, 4)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "longitude",
-          "type": "NUMERIC(20, 4)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "observed_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "expires_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_pilot_location_events_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_location_events",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_pilot_history_retention",
-          "columns": [
-            "expires_at",
-            "id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        },
-        {
-          "name": "ix_pilot_history_subject_time",
-          "columns": [
-            "pilot_id",
-            "observed_at",
-            "id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        },
-        {
-          "name": "ix_pilot_location_events_pilot_id",
-          "columns": [
-            "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_service_zones",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "pilot_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "fulfillment.pilot_profiles.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "zone_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.service_zones.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_pilot_service_zones_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "fk_pilot_service_zones_zone_id_service_zones",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "zone_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_service_zones",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_pilot_service_zones_pilot_id",
-          "columns": [
-            "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        },
-        {
-          "name": "ix_pilot_service_zones_zone_id",
-          "columns": [
-            "zone_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_shifts",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "pilot_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "fulfillment.pilot_profiles.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
           "server_default": null
         },
         {
@@ -11405,7 +10380,7 @@
         {
           "name": "ends_at",
           "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
+          "nullable": true,
           "primary_key": false,
           "foreign_keys": [],
           "server_default": null
@@ -11413,15 +10388,23 @@
       ],
       "constraints": [
         {
-          "name": "fk_pilot_shifts_pilot_id_pilot_profiles",
+          "name": "fk_tax_rules_city_id_cities",
           "type": "ForeignKeyConstraint",
           "sql": null,
           "columns": [
-            "pilot_id"
+            "city_id"
           ]
         },
         {
-          "name": "pk_pilot_shifts",
+          "name": "fk_tax_rules_tax_code_id_tax_codes",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "tax_code_id"
+          ]
+        },
+        {
+          "name": "pk_tax_rules",
           "type": "PrimaryKeyConstraint",
           "sql": null,
           "columns": [
@@ -11431,9 +10414,17 @@
       ],
       "indexes": [
         {
-          "name": "ix_pilot_shifts_pilot_id",
+          "name": "ix_tax_rules_city_id",
           "columns": [
-            "pilot_id"
+            "city_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        },
+        {
+          "name": "ix_tax_rules_tax_code_id",
+          "columns": [
+            "tax_code_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -11442,115 +10433,7 @@
     },
     {
       "schema": "fulfillment",
-      "name": "pilot_status_history",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "pilot_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "fulfillment.pilot_profiles.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "previous",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "current",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "actor_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "identity.users.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_pilot_status_history_actor_id_users",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "actor_id"
-          ]
-        },
-        {
-          "name": "fk_pilot_status_history_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_status_history",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_pilot_status_history_actor_id",
-          "columns": [
-            "actor_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        },
-        {
-          "name": "ix_pilot_status_history_pilot_id",
-          "columns": [
-            "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "fulfillment",
-      "name": "pilot_vehicles",
+      "name": "dispatch_policies",
       "columns": [
         {
           "name": "id",
@@ -11577,516 +10460,16 @@
           "server_default": "now()"
         },
         {
-          "name": "pilot_id",
+          "name": "city_id",
           "type": "UUID",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [
             {
-              "target": "fulfillment.pilot_profiles.id",
+              "target": "geo.cities.id",
               "on_delete": "RESTRICT"
             }
           ],
-          "server_default": null
-        },
-        {
-          "name": "vehicle_type",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "registration_token",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_pilot_vehicles_pilot_id_pilot_profiles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "pilot_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_vehicles",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_pilot_vehicles_pilot_id",
-          "columns": [
-            "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "geo",
-      "name": "delivery_service_areas",
-      "columns": [
-        {
-          "name": "zone_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.service_zones.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "name",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "spatial_ready",
-          "type": "BOOLEAN",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "false"
-        },
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_delivery_service_areas_zone_id_service_zones",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "zone_id"
-          ]
-        },
-        {
-          "name": "pk_delivery_service_areas",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        },
-        {
-          "name": "uq_delivery_service_areas_id",
-          "type": "UniqueConstraint",
-          "sql": null,
-          "columns": [
-            "id",
-            "zone_id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_delivery_service_areas_zone_id",
-          "columns": [
-            "zone_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "geo",
-      "name": "geo_locations",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "address_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.addresses.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "latitude",
-          "type": "NUMERIC(20, 4)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "longitude",
-          "type": "NUMERIC(20, 4)",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "source",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "ck_geo_locations_rule_0",
-          "type": "CheckConstraint",
-          "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180",
-          "columns": []
-        },
-        {
-          "name": "fk_geo_locations_address_id_addresses",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "address_id"
-          ]
-        },
-        {
-          "name": "pk_geo_locations",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_geo_locations_address_id",
-          "columns": [
-            "address_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "geo",
-      "name": "holidays",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "calendar_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.operating_calendars.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "local_date",
-          "type": "DATE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "closed",
-          "type": "BOOLEAN",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "name",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_holidays_calendar_id_operating_calendars",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "calendar_id"
-          ]
-        },
-        {
-          "name": "pk_holidays",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        },
-        {
-          "name": "uq_holidays_calendar_id",
-          "type": "UniqueConstraint",
-          "sql": null,
-          "columns": [
-            "calendar_id",
-            "local_date"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_holidays_calendar_id",
-          "columns": [
-            "calendar_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "geo",
-      "name": "zone_boundaries",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "zone_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.service_zones.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "revision",
-          "type": "INTEGER",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "effective_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "object_key",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_zone_boundaries_zone_id_service_zones",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "zone_id"
-          ]
-        },
-        {
-          "name": "pk_zone_boundaries",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        },
-        {
-          "name": "uq_zone_boundaries_zone_id",
-          "type": "UniqueConstraint",
-          "sql": null,
-          "columns": [
-            "zone_id",
-            "revision"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_zone_boundaries_zone_id",
-          "columns": [
-            "zone_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "geo",
-      "name": "zone_capacity_settings",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "zone_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.service_zones.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "maximum_active_tasks",
-          "type": "INTEGER",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
           "server_default": null
         },
         {
@@ -12096,103 +10479,10 @@
           "primary_key": false,
           "foreign_keys": [],
           "server_default": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "ck_zone_capacity_settings_rule_0",
-          "type": "CheckConstraint",
-          "sql": "maximum_active_tasks > 0",
-          "columns": []
         },
         {
-          "name": "fk_zone_capacity_settings_zone_id_service_zones",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "zone_id"
-          ]
-        },
-        {
-          "name": "pk_zone_capacity_settings",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        },
-        {
-          "name": "uq_zone_capacity_settings_zone_id",
-          "type": "UniqueConstraint",
-          "sql": null,
-          "columns": [
-            "zone_id"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_zone_capacity_settings_zone_id",
-          "columns": [
-            "zone_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "geo",
-      "name": "zone_delivery_policies",
-      "columns": [
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "zone_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.service_zones.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "delivery_method",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "maximum_distance_m",
-          "type": "INTEGER",
+          "name": "weights",
+          "type": "JSONB",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [],
@@ -12209,21 +10499,15 @@
       ],
       "constraints": [
         {
-          "name": "ck_zone_delivery_policies_rule_0",
-          "type": "CheckConstraint",
-          "sql": "maximum_distance_m > 0",
-          "columns": []
-        },
-        {
-          "name": "fk_zone_delivery_policies_zone_id_service_zones",
+          "name": "fk_dispatch_policies_city_id_cities",
           "type": "ForeignKeyConstraint",
           "sql": null,
           "columns": [
-            "zone_id"
+            "city_id"
           ]
         },
         {
-          "name": "pk_zone_delivery_policies",
+          "name": "pk_dispatch_policies",
           "type": "PrimaryKeyConstraint",
           "sql": null,
           "columns": [
@@ -12231,20 +10515,194 @@
           ]
         },
         {
-          "name": "uq_zone_delivery_policies_zone_id",
+          "name": "uq_dispatch_policies_city_id",
           "type": "UniqueConstraint",
           "sql": null,
           "columns": [
-            "zone_id",
-            "delivery_method"
+            "city_id",
+            "version"
           ]
         }
       ],
       "indexes": [
         {
-          "name": "ix_zone_delivery_policies_zone_id",
+          "name": "ix_dispatch_policies_city_id",
           "columns": [
-            "zone_id"
+            "city_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_profiles",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "identity.users.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "city_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.cities.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "verified",
+          "type": "BOOLEAN",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "available",
+          "type": "BOOLEAN",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "offline"
+        },
+        {
+          "name": "max_active_tasks",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "1"
+        },
+        {
+          "name": "vehicle_type",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "bike"
+        },
+        {
+          "name": "location_consent_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "location_consent_version",
+          "type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_pilot_profiles_pilot_location_consent_pair",
+          "type": "CheckConstraint",
+          "sql": "(location_consent_at IS NULL) = (location_consent_version IS NULL)",
+          "columns": []
+        },
+        {
+          "name": "ck_pilot_profiles_pilot_state",
+          "type": "CheckConstraint",
+          "sql": "state IN ('offline','online_available','offer_pending','assigned','on_break','unavailable','suspended')",
+          "columns": []
+        },
+        {
+          "name": "ck_pilot_profiles_pilot_task_capacity",
+          "type": "CheckConstraint",
+          "sql": "max_active_tasks BETWEEN 1 AND 5",
+          "columns": []
+        },
+        {
+          "name": "fk_pilot_profiles_city_id_cities",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "city_id"
+          ]
+        },
+        {
+          "name": "fk_pilot_profiles_user_id_users",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_profiles",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_pilot_profiles_user_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "user_id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_profiles_city_id",
+          "columns": [
+            "city_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -12253,7 +10711,137 @@
     },
     {
       "schema": "geo",
-      "name": "zone_operating_hours",
+      "name": "addresses",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "identity.users.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "city_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.cities.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "label",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "address_text",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "latitude",
+          "type": "NUMERIC(10, 7)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "longitude",
+          "type": "NUMERIC(10, 7)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_addresses_coordinates",
+          "type": "CheckConstraint",
+          "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180",
+          "columns": []
+        },
+        {
+          "name": "fk_addresses_city_id_cities",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "city_id"
+          ]
+        },
+        {
+          "name": "fk_addresses_user_id_users",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "pk_addresses",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_addresses_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "operating_calendars",
       "columns": [
         {
           "name": "id",
@@ -12280,37 +10868,29 @@
           "server_default": "now()"
         },
         {
-          "name": "zone_id",
+          "name": "city_id",
           "type": "UUID",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [
             {
-              "target": "geo.service_zones.id",
+              "target": "geo.cities.id",
               "on_delete": "RESTRICT"
             }
           ],
           "server_default": null
         },
         {
-          "name": "weekday",
-          "type": "INTEGER",
+          "name": "name",
+          "type": "TEXT",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [],
           "server_default": null
         },
         {
-          "name": "opens_at",
-          "type": "TIME WITHOUT TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "closes_at",
-          "type": "TIME WITHOUT TIME ZONE",
+          "name": "timezone",
+          "type": "TEXT",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [],
@@ -12319,27 +10899,15 @@
       ],
       "constraints": [
         {
-          "name": "ck_zone_operating_hours_rule_0",
-          "type": "CheckConstraint",
-          "sql": "weekday BETWEEN 0 AND 6",
-          "columns": []
-        },
-        {
-          "name": "ck_zone_operating_hours_rule_1",
-          "type": "CheckConstraint",
-          "sql": "opens_at < closes_at",
-          "columns": []
-        },
-        {
-          "name": "fk_zone_operating_hours_zone_id_service_zones",
+          "name": "fk_operating_calendars_city_id_cities",
           "type": "ForeignKeyConstraint",
           "sql": null,
           "columns": [
-            "zone_id"
+            "city_id"
           ]
         },
         {
-          "name": "pk_zone_operating_hours",
+          "name": "pk_operating_calendars",
           "type": "PrimaryKeyConstraint",
           "sql": null,
           "columns": [
@@ -12349,9 +10917,9 @@
       ],
       "indexes": [
         {
-          "name": "ix_zone_operating_hours_zone_id",
+          "name": "ix_operating_calendars_city_id",
           "columns": [
-            "zone_id"
+            "city_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -12360,36 +10928,119 @@
     },
     {
       "schema": "geo",
-      "name": "zone_service_categories",
+      "name": "postal_codes",
       "columns": [
         {
-          "name": "zone_id",
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "city_id",
           "type": "UUID",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [
             {
-              "target": "geo.service_zones.id",
+              "target": "geo.cities.id",
               "on_delete": "RESTRICT"
             }
           ],
           "server_default": null
         },
         {
-          "name": "category_id",
+          "name": "code",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_postal_codes_city_id_cities",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "city_id"
+          ]
+        },
+        {
+          "name": "pk_postal_codes",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_postal_codes_city_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "city_id",
+            "code"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_postal_codes_city_id",
+          "columns": [
+            "city_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "service_zones",
+      "columns": [
+        {
+          "name": "city_id",
           "type": "UUID",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [
             {
-              "target": "catalog.product_categories.id",
+              "target": "geo.cities.id",
               "on_delete": "RESTRICT"
             }
           ],
           "server_default": null
         },
         {
-          "name": "enabled",
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "active",
           "type": "BOOLEAN",
           "nullable": false,
           "primary_key": false,
@@ -12423,23 +11074,15 @@
       ],
       "constraints": [
         {
-          "name": "fk_zone_service_categories_category_id_product_categories",
+          "name": "fk_service_zones_city_id_cities",
           "type": "ForeignKeyConstraint",
           "sql": null,
           "columns": [
-            "category_id"
+            "city_id"
           ]
         },
         {
-          "name": "fk_zone_service_categories_zone_id_service_zones",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "zone_id"
-          ]
-        },
-        {
-          "name": "pk_zone_service_categories",
+          "name": "pk_service_zones",
           "type": "PrimaryKeyConstraint",
           "sql": null,
           "columns": [
@@ -12447,20 +11090,20 @@
           ]
         },
         {
-          "name": "uq_zone_service_categories_zone_id",
+          "name": "uq_service_zones_city_id",
           "type": "UniqueConstraint",
           "sql": null,
           "columns": [
-            "zone_id",
-            "category_id"
+            "city_id",
+            "name"
           ]
         }
       ],
       "indexes": [
         {
-          "name": "ix_zone_service_categories_zone_id",
+          "name": "ix_service_zones_city_id",
           "columns": [
-            "zone_id"
+            "city_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -13140,6 +11783,139 @@
           "name": "ix_ai_feedback_user_id",
           "columns": [
             "user_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "intelligence",
+      "name": "ai_optimization_decisions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "city_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.cities.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "mode",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "policy_version",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "objective_score",
+          "type": "NUMERIC(20, 4)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "plan",
+          "type": "JSONB",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "constraint_checks",
+          "type": "JSONB",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "runtime_ms",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "fallback_reason",
+          "type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_ai_optimization_decisions_rule_0",
+          "type": "CheckConstraint",
+          "sql": "runtime_ms >= 0",
+          "columns": []
+        },
+        {
+          "name": "fk_ai_optimization_decisions_city_id_cities",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "city_id"
+          ]
+        },
+        {
+          "name": "pk_ai_optimization_decisions",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_ai_optimization_decisions_city_id",
+          "columns": [
+            "city_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -13977,6 +12753,101 @@
           "name": "ix_merchant_tax_registrations_legal_entity_id",
           "columns": [
             "legal_entity_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "operations",
+      "name": "operational_incidents",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "city_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.cities.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "severity",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "summary",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_operational_incidents_city_id_cities",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "city_id"
+          ]
+        },
+        {
+          "name": "pk_operational_incidents",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_operational_incidents_city_id",
+          "columns": [
+            "city_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -17332,6 +16203,85 @@
     },
     {
       "schema": "fulfillment",
+      "name": "delivery_routes",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_delivery_routes_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "pk_delivery_routes",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_delivery_routes_pilot_id",
+          "columns": [
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
       "name": "delivery_windows",
       "columns": [
         {
@@ -17441,7 +16391,7 @@
     },
     {
       "schema": "fulfillment",
-      "name": "pilot_vehicle_assignments",
+      "name": "pilot_availability",
       "columns": [
         {
           "name": "id",
@@ -17481,30 +16431,17 @@
           "server_default": null
         },
         {
-          "name": "vehicle_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "fulfillment.pilot_vehicles.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "starts_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
+          "name": "available",
+          "type": "BOOLEAN",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [],
           "server_default": null
         },
         {
-          "name": "ends_at",
+          "name": "changed_at",
           "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": true,
+          "nullable": false,
           "primary_key": false,
           "foreign_keys": [],
           "server_default": null
@@ -17512,7 +16449,7 @@
       ],
       "constraints": [
         {
-          "name": "fk_pilot_vehicle_assignments_pilot_id_pilot_profiles",
+          "name": "fk_pilot_availability_pilot_id_pilot_profiles",
           "type": "ForeignKeyConstraint",
           "sql": null,
           "columns": [
@@ -17520,15 +16457,7 @@
           ]
         },
         {
-          "name": "fk_pilot_vehicle_assignments_vehicle_id_pilot_vehicles",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "vehicle_id"
-          ]
-        },
-        {
-          "name": "pk_pilot_vehicle_assignments",
+          "name": "pk_pilot_availability",
           "type": "PrimaryKeyConstraint",
           "sql": null,
           "columns": [
@@ -17538,17 +16467,9 @@
       ],
       "indexes": [
         {
-          "name": "ix_pilot_vehicle_assignments_pilot_id",
+          "name": "ix_pilot_availability_pilot_id",
           "columns": [
             "pilot_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        },
-        {
-          "name": "ix_pilot_vehicle_assignments_vehicle_id",
-          "columns": [
-            "vehicle_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -17557,7 +16478,7 @@
     },
     {
       "schema": "fulfillment",
-      "name": "route_optimization_runs",
+      "name": "pilot_capabilities",
       "columns": [
         {
           "name": "id",
@@ -17584,20 +16505,20 @@
           "server_default": "now()"
         },
         {
-          "name": "route_id",
+          "name": "pilot_id",
           "type": "UUID",
           "nullable": false,
           "primary_key": false,
           "foreign_keys": [
             {
-              "target": "fulfillment.delivery_routes.id",
+              "target": "fulfillment.pilot_profiles.id",
               "on_delete": "RESTRICT"
             }
           ],
           "server_default": null
         },
         {
-          "name": "strategy",
+          "name": "capability",
           "type": "TEXT",
           "nullable": false,
           "primary_key": false,
@@ -17605,17 +16526,9 @@
           "server_default": null
         },
         {
-          "name": "input_hash",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "result",
-          "type": "JSONB",
-          "nullable": false,
+          "name": "expires_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
           "primary_key": false,
           "foreign_keys": [],
           "server_default": null
@@ -17623,15 +16536,15 @@
       ],
       "constraints": [
         {
-          "name": "fk_route_optimization_runs_route_id_delivery_routes",
+          "name": "fk_pilot_capabilities_pilot_id_pilot_profiles",
           "type": "ForeignKeyConstraint",
           "sql": null,
           "columns": [
-            "route_id"
+            "pilot_id"
           ]
         },
         {
-          "name": "pk_route_optimization_runs",
+          "name": "pk_pilot_capabilities",
           "type": "PrimaryKeyConstraint",
           "sql": null,
           "columns": [
@@ -17641,9 +16554,1035 @@
       ],
       "indexes": [
         {
-          "name": "ix_route_optimization_runs_route_id",
+          "name": "ix_pilot_capabilities_pilot_id",
           "columns": [
-            "route_id"
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_documents",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "document_type",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "private_object_key",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "expires_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_pilot_documents_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_documents",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_documents_pilot_id",
+          "columns": [
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_incentives",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "currency_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "finance.currencies.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "amount",
+          "type": "NUMERIC(20, 4)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "policy_reference",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_pilot_incentives_currency_id_currencies",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "currency_id"
+          ]
+        },
+        {
+          "name": "fk_pilot_incentives_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_incentives",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_incentives_currency_id",
+          "columns": [
+            "currency_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        },
+        {
+          "name": "ix_pilot_incentives_pilot_id",
+          "columns": [
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_latest_location",
+      "columns": [
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "latitude",
+          "type": "NUMERIC(10, 7)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "longitude",
+          "type": "NUMERIC(10, 7)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "observed_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "accuracy_m",
+          "type": "NUMERIC(8, 2)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "heading_degrees",
+          "type": "NUMERIC(6, 2)",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "speed_mps",
+          "type": "NUMERIC(7, 2)",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "client_sequence",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "battery_percent",
+          "type": "INTEGER",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "app_state",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_pilot_latest_location_location_accuracy",
+          "type": "CheckConstraint",
+          "sql": "accuracy_m BETWEEN 0 AND 1000",
+          "columns": []
+        },
+        {
+          "name": "ck_pilot_latest_location_location_app_state",
+          "type": "CheckConstraint",
+          "sql": "app_state IN ('foreground','background')",
+          "columns": []
+        },
+        {
+          "name": "ck_pilot_latest_location_location_battery",
+          "type": "CheckConstraint",
+          "sql": "battery_percent IS NULL OR battery_percent BETWEEN 0 AND 100",
+          "columns": []
+        },
+        {
+          "name": "ck_pilot_latest_location_location_coordinates",
+          "type": "CheckConstraint",
+          "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180",
+          "columns": []
+        },
+        {
+          "name": "ck_pilot_latest_location_location_heading",
+          "type": "CheckConstraint",
+          "sql": "heading_degrees IS NULL OR heading_degrees BETWEEN 0 AND 360",
+          "columns": []
+        },
+        {
+          "name": "ck_pilot_latest_location_location_speed",
+          "type": "CheckConstraint",
+          "sql": "speed_mps IS NULL OR speed_mps BETWEEN 0 AND 100",
+          "columns": []
+        },
+        {
+          "name": "fk_pilot_latest_location_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_latest_location",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_pilot_latest_location_pilot_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_location_consents",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "policy_version",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "accepted",
+          "type": "BOOLEAN",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_pilot_location_consents_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_location_consents",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_location_consents_pilot_id",
+          "columns": [
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_location_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "latitude",
+          "type": "NUMERIC(10, 7)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "longitude",
+          "type": "NUMERIC(10, 7)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "observed_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "accuracy_m",
+          "type": "NUMERIC(20, 4)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "heading_degrees",
+          "type": "NUMERIC(20, 4)",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "speed_mps",
+          "type": "NUMERIC(20, 4)",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "client_sequence",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "battery_percent",
+          "type": "INTEGER",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "app_state",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "expires_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_pilot_location_events_rule_0",
+          "type": "CheckConstraint",
+          "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180",
+          "columns": []
+        },
+        {
+          "name": "fk_pilot_location_events_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_location_events",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_history_retention",
+          "columns": [
+            "expires_at",
+            "id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        },
+        {
+          "name": "ix_pilot_history_subject_time",
+          "columns": [
+            "pilot_id",
+            "observed_at",
+            "id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        },
+        {
+          "name": "ix_pilot_location_events_pilot_id",
+          "columns": [
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_service_zones",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "zone_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.service_zones.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_pilot_service_zones_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "fk_pilot_service_zones_zone_id_service_zones",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_service_zones",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_service_zones_pilot_id",
+          "columns": [
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        },
+        {
+          "name": "ix_pilot_service_zones_zone_id",
+          "columns": [
+            "zone_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_shifts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "starts_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "ends_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_pilot_shifts_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_shifts",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_shifts_pilot_id",
+          "columns": [
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_status_history",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "previous",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "current",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "actor_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "identity.users.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_pilot_status_history_actor_id_users",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "actor_id"
+          ]
+        },
+        {
+          "name": "fk_pilot_status_history_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_status_history",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_status_history_actor_id",
+          "columns": [
+            "actor_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        },
+        {
+          "name": "ix_pilot_status_history_pilot_id",
+          "columns": [
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "pilot_vehicles",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "vehicle_type",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "registration_token",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_pilot_vehicles_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_vehicles",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_vehicles_pilot_id",
+          "columns": [
+            "pilot_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -17777,6 +17716,838 @@
           "name": "ix_scheduled_order_occurrences_plan_id",
           "columns": [
             "plan_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "delivery_service_areas",
+      "columns": [
+        {
+          "name": "zone_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.service_zones.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "spatial_ready",
+          "type": "BOOLEAN",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "false"
+        },
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_delivery_service_areas_zone_id_service_zones",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id"
+          ]
+        },
+        {
+          "name": "pk_delivery_service_areas",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_delivery_service_areas_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "id",
+            "zone_id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_delivery_service_areas_zone_id",
+          "columns": [
+            "zone_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "geo_locations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "address_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.addresses.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "latitude",
+          "type": "NUMERIC(10, 7)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "longitude",
+          "type": "NUMERIC(10, 7)",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_geo_locations_rule_0",
+          "type": "CheckConstraint",
+          "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180",
+          "columns": []
+        },
+        {
+          "name": "fk_geo_locations_address_id_addresses",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "address_id"
+          ]
+        },
+        {
+          "name": "pk_geo_locations",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_geo_locations_address_id",
+          "columns": [
+            "address_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "holidays",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "calendar_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.operating_calendars.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "local_date",
+          "type": "DATE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "closed",
+          "type": "BOOLEAN",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_holidays_calendar_id_operating_calendars",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "calendar_id"
+          ]
+        },
+        {
+          "name": "pk_holidays",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_holidays_calendar_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "calendar_id",
+            "local_date"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_holidays_calendar_id",
+          "columns": [
+            "calendar_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "zone_boundaries",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "zone_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.service_zones.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "effective_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "object_key",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_zone_boundaries_zone_id_service_zones",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id"
+          ]
+        },
+        {
+          "name": "pk_zone_boundaries",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_zone_boundaries_zone_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id",
+            "revision"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_zone_boundaries_zone_id",
+          "columns": [
+            "zone_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "zone_capacity_settings",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "zone_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.service_zones.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "maximum_active_tasks",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_zone_capacity_settings_rule_0",
+          "type": "CheckConstraint",
+          "sql": "maximum_active_tasks > 0",
+          "columns": []
+        },
+        {
+          "name": "fk_zone_capacity_settings_zone_id_service_zones",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id"
+          ]
+        },
+        {
+          "name": "pk_zone_capacity_settings",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_zone_capacity_settings_zone_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_zone_capacity_settings_zone_id",
+          "columns": [
+            "zone_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "zone_delivery_policies",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "zone_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.service_zones.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "delivery_method",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "maximum_distance_m",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "active",
+          "type": "BOOLEAN",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_zone_delivery_policies_rule_0",
+          "type": "CheckConstraint",
+          "sql": "maximum_distance_m > 0",
+          "columns": []
+        },
+        {
+          "name": "fk_zone_delivery_policies_zone_id_service_zones",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id"
+          ]
+        },
+        {
+          "name": "pk_zone_delivery_policies",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_zone_delivery_policies_zone_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id",
+            "delivery_method"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_zone_delivery_policies_zone_id",
+          "columns": [
+            "zone_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "zone_operating_hours",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "zone_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.service_zones.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "weekday",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "opens_at",
+          "type": "TIME WITHOUT TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "closes_at",
+          "type": "TIME WITHOUT TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_zone_operating_hours_rule_0",
+          "type": "CheckConstraint",
+          "sql": "weekday BETWEEN 0 AND 6",
+          "columns": []
+        },
+        {
+          "name": "ck_zone_operating_hours_rule_1",
+          "type": "CheckConstraint",
+          "sql": "opens_at < closes_at",
+          "columns": []
+        },
+        {
+          "name": "fk_zone_operating_hours_zone_id_service_zones",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id"
+          ]
+        },
+        {
+          "name": "pk_zone_operating_hours",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_zone_operating_hours_zone_id",
+          "columns": [
+            "zone_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "geo",
+      "name": "zone_service_categories",
+      "columns": [
+        {
+          "name": "zone_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.service_zones.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "category_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "catalog.product_categories.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "enabled",
+          "type": "BOOLEAN",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_zone_service_categories_category_id_product_categories",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "category_id"
+          ]
+        },
+        {
+          "name": "fk_zone_service_categories_zone_id_service_zones",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id"
+          ]
+        },
+        {
+          "name": "pk_zone_service_categories",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_zone_service_categories_zone_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id",
+            "category_id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_zone_service_categories_zone_id",
+          "columns": [
+            "zone_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -18174,6 +18945,160 @@
           "name": "ix_ai_agent_action_approvals_tool_call_id",
           "columns": [
             "tool_call_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "intelligence",
+      "name": "ai_forecast_outputs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "city_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.cities.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "zone_id",
+          "type": "UUID",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.service_zones.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "interval_minutes",
+          "type": "INTEGER",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "forecast",
+          "type": "JSONB",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "provenance",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "feature_schema_version",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "source_cutoff",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "expires_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ck_ai_forecast_outputs_rule_0",
+          "type": "CheckConstraint",
+          "sql": "interval_minutes > 0",
+          "columns": []
+        },
+        {
+          "name": "fk_ai_forecast_outputs_city_id_cities",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "city_id"
+          ]
+        },
+        {
+          "name": "fk_ai_forecast_outputs_zone_id_service_zones",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "zone_id"
+          ]
+        },
+        {
+          "name": "pk_ai_forecast_outputs",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_ai_forecast_outputs_city_id",
+          "columns": [
+            "city_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        },
+        {
+          "name": "ix_ai_forecast_outputs_zone_id",
+          "columns": [
+            "zone_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -18908,138 +19833,6 @@
       "indexes": [
         {
           "name": "ix_merchant_operating_hours_branch_id",
-          "columns": [
-            "branch_id"
-          ],
-          "unique": false,
-          "predicate": "None"
-        }
-      ]
-    },
-    {
-      "schema": "merchant",
-      "name": "merchant_service_areas",
-      "columns": [
-        {
-          "name": "branch_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "merchant.merchant_branches.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "area_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "geo.delivery_service_areas.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "category_id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [
-            {
-              "target": "catalog.product_categories.id",
-              "on_delete": "RESTRICT"
-            }
-          ],
-          "server_default": null
-        },
-        {
-          "name": "delivery_method",
-          "type": "TEXT",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "id",
-          "type": "UUID",
-          "nullable": false,
-          "primary_key": true,
-          "foreign_keys": [],
-          "server_default": null
-        },
-        {
-          "name": "created_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        },
-        {
-          "name": "updated_at",
-          "type": "TIMESTAMP WITH TIME ZONE",
-          "nullable": false,
-          "primary_key": false,
-          "foreign_keys": [],
-          "server_default": "now()"
-        }
-      ],
-      "constraints": [
-        {
-          "name": "fk_merchant_service_areas_area_id_delivery_service_areas",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "area_id"
-          ]
-        },
-        {
-          "name": "fk_merchant_service_areas_branch_id_merchant_branches",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "branch_id"
-          ]
-        },
-        {
-          "name": "fk_merchant_service_areas_category_id_product_categories",
-          "type": "ForeignKeyConstraint",
-          "sql": null,
-          "columns": [
-            "category_id"
-          ]
-        },
-        {
-          "name": "pk_merchant_service_areas",
-          "type": "PrimaryKeyConstraint",
-          "sql": null,
-          "columns": [
-            "id"
-          ]
-        },
-        {
-          "name": "uq_merchant_service_areas_branch_id",
-          "type": "UniqueConstraint",
-          "sql": null,
-          "columns": [
-            "branch_id",
-            "area_id",
-            "category_id",
-            "delivery_method"
-          ]
-        }
-      ],
-      "indexes": [
-        {
-          "name": "ix_merchant_service_areas_branch_id",
           "columns": [
             "branch_id"
           ],
@@ -20449,11 +21242,11 @@
           "primary_key": false,
           "foreign_keys": [
             {
-              "target": "finance.journal_entries.organization_id",
+              "target": "finance.ledger_accounts.organization_id",
               "on_delete": "RESTRICT"
             },
             {
-              "target": "finance.ledger_accounts.organization_id",
+              "target": "finance.journal_entries.organization_id",
               "on_delete": "RESTRICT"
             }
           ],
@@ -21688,6 +22481,217 @@
     },
     {
       "schema": "fulfillment",
+      "name": "pilot_vehicle_assignments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "pilot_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_profiles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "vehicle_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.pilot_vehicles.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "starts_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "ends_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_pilot_vehicle_assignments_pilot_id_pilot_profiles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "pilot_id"
+          ]
+        },
+        {
+          "name": "fk_pilot_vehicle_assignments_vehicle_id_pilot_vehicles",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "vehicle_id"
+          ]
+        },
+        {
+          "name": "pk_pilot_vehicle_assignments",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_pilot_vehicle_assignments_pilot_id",
+          "columns": [
+            "pilot_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        },
+        {
+          "name": "ix_pilot_vehicle_assignments_vehicle_id",
+          "columns": [
+            "vehicle_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
+      "name": "route_optimization_runs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "route_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.delivery_routes.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "strategy",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "input_hash",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "result",
+          "type": "JSONB",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_route_optimization_runs_route_id_delivery_routes",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "route_id"
+          ]
+        },
+        {
+          "name": "pk_route_optimization_runs",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_route_optimization_runs_route_id",
+          "columns": [
+            "route_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
       "name": "scheduled_orders",
       "columns": [
         {
@@ -22343,6 +23347,138 @@
           "name": "ix_stock_count_sessions_started_by",
           "columns": [
             "started_by"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "merchant",
+      "name": "merchant_service_areas",
+      "columns": [
+        {
+          "name": "branch_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "merchant.merchant_branches.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "area_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "geo.delivery_service_areas.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "category_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "catalog.product_categories.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "delivery_method",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_merchant_service_areas_area_id_delivery_service_areas",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "area_id"
+          ]
+        },
+        {
+          "name": "fk_merchant_service_areas_branch_id_merchant_branches",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "branch_id"
+          ]
+        },
+        {
+          "name": "fk_merchant_service_areas_category_id_product_categories",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "category_id"
+          ]
+        },
+        {
+          "name": "pk_merchant_service_areas",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_merchant_service_areas_branch_id",
+          "type": "UniqueConstraint",
+          "sql": null,
+          "columns": [
+            "branch_id",
+            "area_id",
+            "category_id",
+            "delivery_method"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_merchant_service_areas_branch_id",
+          "columns": [
+            "branch_id"
           ],
           "unique": false,
           "predicate": "None"
@@ -25117,6 +26253,133 @@
     },
     {
       "schema": "fulfillment",
+      "name": "eta_estimates",
+      "columns": [
+        {
+          "name": "id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": true,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": "now()"
+        },
+        {
+          "name": "task_id",
+          "type": "UUID",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [
+            {
+              "target": "fulfillment.delivery_tasks.id",
+              "on_delete": "RESTRICT"
+            }
+          ],
+          "server_default": null
+        },
+        {
+          "name": "generated_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "pickup_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": true,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "delivery_at",
+          "type": "TIMESTAMP WITH TIME ZONE",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "confidence",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "rule_version",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "foreign_keys": [],
+          "server_default": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "fk_eta_estimates_task_id_delivery_tasks",
+          "type": "ForeignKeyConstraint",
+          "sql": null,
+          "columns": [
+            "task_id"
+          ]
+        },
+        {
+          "name": "pk_eta_estimates",
+          "type": "PrimaryKeyConstraint",
+          "sql": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_eta_estimates_task_id",
+          "columns": [
+            "task_id"
+          ],
+          "unique": false,
+          "predicate": "None"
+        }
+      ]
+    },
+    {
+      "schema": "fulfillment",
       "name": "pickup_confirmations",
       "columns": [
         {
@@ -26809,10 +28072,10 @@
       ]
     }
   ],
-  "table_count": 247,
-  "constraint_count": 793,
-  "index_count": 345,
-  "trigger_count": 57,
-  "orm_constraint_count": 792,
+  "table_count": 255,
+  "constraint_count": 828,
+  "index_count": 354,
+  "trigger_count": 59,
+  "orm_constraint_count": 827,
   "constraint_trigger_count": 1
 }

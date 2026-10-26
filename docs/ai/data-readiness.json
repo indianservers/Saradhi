@@ -1,0 +1,41 @@
+{
+  "development": {
+    "database": "quickbuddy_dev",
+    "migration": "20261026_0010",
+    "counts": {
+      "orders_total": 0,
+      "orders_last_28d": 0,
+      "merchant_orders_total": 0,
+      "merchant_orders_ready_or_fulfilled": 0,
+      "completed_delivery_tasks": 0,
+      "delivery_confirmations": 0,
+      "eta_estimates": 0,
+      "cancellation_records": 0,
+      "hourly_demand_buckets_last_28d": 0,
+      "preparation_duration_labels": 0,
+      "note": "No per-merchant-order preparation start/ready timestamp pair exists in current event schema.",
+      "model_training_status": "untrained",
+      "test_data_excluded": false
+    }
+  },
+  "test": {
+    "database": "quickbuddy_test",
+    "migration": "20261026_0010",
+    "counts": {
+      "orders_total": 1704,
+      "orders_last_28d": 1704,
+      "merchant_orders_total": 1735,
+      "merchant_orders_ready_or_fulfilled": 54,
+      "completed_delivery_tasks": 45,
+      "delivery_confirmations": 26,
+      "eta_estimates": 9,
+      "cancellation_records": 0,
+      "hourly_demand_buckets_last_28d": 3,
+      "preparation_duration_labels": 0,
+      "note": "No per-merchant-order preparation start/ready timestamp pair exists in current event schema.",
+      "model_training_status": "untrained",
+      "test_data_excluded": true
+    }
+  },
+  "generated_at": "2026-10-26T15:21:04.161284+00:00"
+}

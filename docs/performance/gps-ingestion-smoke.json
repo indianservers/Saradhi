@@ -1,0 +1,9 @@
+{
+  "scope": "local ASGI API + PostgreSQL, sequential controlled smoke",
+  "samples": 30,
+  "elapsed_seconds": 0.742,
+  "throughput_updates_per_second": 40.43,
+  "latency_ms_p50": 23.63,
+  "latency_ms_p95": 41.27,
+  "limitations": "single process, one pilot, sequential; not a capacity or concurrency claim"
+}

@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     sandbox_webhook_secret: SecretStr = SecretStr("")
     otp_pepper: SecretStr = SecretStr("")
     auth_rate_limit_per_minute: int = Field(default=20, ge=1, le=10000)
+    pilot_location_fresh_seconds: int = Field(default=90, ge=15, le=300)
+    pilot_location_history_interval_seconds: int = Field(default=15, ge=5, le=300)
+    pilot_location_retention_days: int = Field(default=7, ge=1, le=30)
+    tracking_websocket_ticket_seconds: int = Field(default=60, ge=15, le=120)
+    tracking_websocket_max_connections: int = Field(default=2000, ge=1, le=20000)
+    pickup_handling_seconds: int = Field(default=180, ge=0, le=1800)
+    delivery_handling_seconds: int = Field(default=120, ge=0, le=1800)
 
     @model_validator(mode="after")
     def validate_config(self):

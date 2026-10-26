@@ -8,6 +8,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
+export { AdminControlTower } from "./admin-control-tower";
 
 export function Shell({
   title,

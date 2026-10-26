@@ -2,10 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:merchant_app/main.dart' as app;
 
 void main() {
-  testWidgets('foundation shell renders', (tester) async {
+  testWidgets('merchant workspace requires sign in instead of showing preview orders', (tester) async {
     app.main();
     await tester.pumpAndSettle();
-    expect(find.text('Your business, connected'), findsOneWidget);
-    expect(find.text('quickbuddy.'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Quick'), findsOneWidget);
+    expect(find.text('Rohit Sharma'), findsNothing);
   });
 }

@@ -1,29 +1,21 @@
-# Phase 2 schema design gates
+# Implemented schema principles
 
-No business tables or initial schema revision exists yet. backend/migrations is the ONLY
-executable Alembic source. database/migrations and database/design are reference/design
-locations; they must never form another migration history. Alembic has no pending revisions.
+Phase 2 schema is now installed; the initial Phase 1 empty-schema gate is historical.
+See enterprise-schema.md, data-dictionary.md, schema.json and the actual migration/catalog report.
 
-Design tenant and geographic scope, branch/category extensibility and indexed ownership
-predicates. Decide aggregate IDs, foreign keys, constraints, state transitions and concurrency
-control from reviewed order lifecycle. Use timestamptz/UTC for instants and IANA timezones for
-schedules. Exact Decimal/integer minor-unit money with ISO currency and explicit scale/rounding.
-Never use floats for balances, commissions, fees, payments or settlement calculations.
+backend/migrations remains the sole executable Alembic source. database/migrations is reference
+only; database/design may contain commented review SQL but never a second runtime history.
+No metadata.create_all, startup migrations, reset-by-default scripts or destructive downgrade.
 
-Plan balanced append-only ledger, reconciled allocations and settlement obligations;
-outbox/inbox/idempotency in the same durable transaction as corresponding effects. Decide
-idempotency retention, TTL and request fingerprint behavior; Redis is only auxiliary.
-Capture audit actor/action/resource with restricted retention and redact sensitive payloads.
+Use real FKs and reviewed constraints, scoped organization/city/branch policies, opaque UUIDv4
+identifiers on Python 3.12, UTC timestamptz, explicit IANA schedules and Numeric/Decimal money.
+Keep legal-entity/currency books separate and historical financial/item/event records immutable.
+Cross-context application services coordinate transactions; domain rules stay framework/ORM free.
 
-Consider PostGIS GiST indexes, pg_trgm catalog search and btree_gist exclusion constraints
-only when required by actual queries. Required now: base PostgreSQL with transactional DDL.
-Extensions are optional future candidates; availability/install versions remain unverified.
-Partition high-volume GPS/audit by retention/region only after workload evidence. No premature
-partitioning of low-volume transactional tables. Document PII classification, residency,
-backup/PITR objectives, deletion policy, index budgets and migration rollback/forward repair.
+Named indexes, per-request sessions, expected versions, row locks, idempotency keys and outbox/
+inbox uniqueness enforce critical behavior. Optional PostGIS requires an approved compatible
+installation and a reviewed additive spatial migration; no guessed polygon behavior.
 
-Use naming convention metadata in backend/shared/database.py; revisions named YYYYMMDD_<rev>_<slug>.
-Review generated migrations, test upgrade from empty and previous snapshots and inspect locks.
-Never create metadata automatically on API startup. Migration credentials must be separate
-from runtime DML roles in production. Sessions commit only after successful use cases and
-rollback on errors; keep external network calls outside database transactions.
+Production migration gates: separate runtime/migration roles, verified TLS, current backup and
+restore drill, representative upgrade/plan tests, lock budget and forward repair. Preserve PII
+retention and residency; do not partition without measured retention/query/uniqueness evidence.

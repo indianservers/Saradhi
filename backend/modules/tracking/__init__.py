@@ -1,1 +1,1 @@
-"""Tracking bounded context. See docs/architecture/module-boundaries.md."""
+"""Privacy-scoped live tracking and GPS ingestion."""

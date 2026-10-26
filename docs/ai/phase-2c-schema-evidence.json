@@ -1,0 +1,32 @@
+{
+  "development": {
+    "database": "quickbuddy_dev",
+    "server_version": "17.11",
+    "migration": "20261026_0010",
+    "tables": 255,
+    "model_tables": 255,
+    "missing_tables": [],
+    "extra_tables": [],
+    "model_columns": 1760,
+    "database_columns": 1760,
+    "missing_columns": [],
+    "extra_columns": [],
+    "timezone_type_issues": [],
+    "invalid_constraints": []
+  },
+  "test": {
+    "database": "quickbuddy_test",
+    "server_version": "17.11",
+    "migration": "20261026_0010",
+    "tables": 255,
+    "model_tables": 255,
+    "missing_tables": [],
+    "extra_tables": [],
+    "model_columns": 1760,
+    "database_columns": 1760,
+    "missing_columns": [],
+    "extra_columns": [],
+    "timezone_type_issues": [],
+    "invalid_constraints": []
+  }
+}

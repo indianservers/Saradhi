@@ -3,6 +3,8 @@ import hmac
 import json
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
+from time import perf_counter
 from uuid import UUID, uuid4
 
 import pytest
@@ -78,6 +80,57 @@ async def test_cross_organization_and_admin_denial(api):
     assert foreign_stock.status_code == 403
 
 
+async def test_city_dispatch_snapshot_and_versioned_scoring_policy(api):
+    client, app = api
+    state = await world(client, app, 1)
+    city_id = state["city"]["id"]
+    first = await client.put(
+        f"/api/v1/operations/cities/{city_id}/dispatch-policy",
+        json={"weights": {"pickup_distance": "1", "workload": "5"}},
+        headers=state["admin"]["headers"],
+    )
+    second = await client.put(
+        f"/api/v1/operations/cities/{city_id}/dispatch-policy",
+        json={"weights": {"pickup_distance": "2", "workload": "8"}},
+        headers=state["admin"]["headers"],
+    )
+    assert first.status_code == second.status_code == 200
+    assert first.json()["version"] == 1 and second.json()["version"] == 2
+    dispatch = await client.get(
+        f"/api/v1/operations/cities/{city_id}/dispatch", headers=state["admin"]["headers"]
+    )
+    fleet = await client.get(
+        f"/api/v1/operations/cities/{city_id}/fleet", headers=state["admin"]["headers"]
+    )
+    assert dispatch.status_code == fleet.status_code == 200
+    denied = await client.get(
+        f"/api/v1/operations/cities/{city_id}/dispatch",
+        headers=state["customer"]["headers"],
+    )
+    assert denied.status_code == 403
+    city_manager = await user(client, app)
+    async with app.state.sessions.begin() as db:
+        role = await db.scalar(select(m.Role).where(m.Role.name == "city_manager"))
+        await add(
+            db,
+            m.RoleAssignment,
+            user_id=UUID(city_manager["id"]),
+            role_id=role.id,
+            organization_id=UUID(state["shops"][0]["organization"]["id"]),
+            city_id=UUID(city_id),
+            branch_id=None,
+        )
+    authorized = await client.get(
+        f"/api/v1/operations/cities/{city_id}/fleet",
+        headers=city_manager["headers"],
+    )
+    outside = await client.get(
+        f"/api/v1/operations/cities/{uuid4()}/fleet",
+        headers=city_manager["headers"],
+    )
+    assert authorized.status_code == 200 and outside.status_code == 403
+
+
 async def test_multimerchant_multislot_checkout_and_idempotency(api):
     client, app = api
     state = await world(client, app)
@@ -132,6 +185,239 @@ async def test_multimerchant_multislot_checkout_and_idempotency(api):
         f"/api/v1/orders/{order['id']}", headers=state["shops"][0]["merchant"]["headers"]
     )
     assert denied.status_code == 403
+
+
+async def test_customer_catalog_cart_reload_and_quote_lines(api):
+    client, app = api
+    state = await world(client, app, 1)
+    customer = state["customer"]
+    branch = state["shops"][0]["branch"]
+
+    discovery = await client.get(
+        "/api/v1/merchants/branches", params={"city_id": state["city"]["id"]}
+    )
+    assert discovery.status_code == 200
+    assert discovery.json()["items"][0]["merchant_type"] == "food"
+
+    catalog = await client.get(
+        "/api/v1/catalog/products",
+        params={"branch_id": branch["id"], "q": "Integration product"},
+        headers=customer["headers"],
+    )
+    assert catalog.status_code == 200
+    product = catalog.json()["items"][0]
+    assert product["name"] == "Integration product"
+    assert product["unit_price"] == "10.0000"
+    assert product["available_quantity"] == "10.0000"
+
+    cart = await post(client, "/carts", None, customer)
+    for shop in state["shops"]:
+        await post(
+            client,
+            f"/carts/{cart['id']}/items",
+            {
+                "branch_id": shop["branch"]["id"],
+                "variant_id": shop["variant"]["id"],
+                "quantity": "1",
+                "window_id": shop["window"]["id"],
+            },
+            customer,
+        )
+    reloaded = await client.get(f"/api/v1/carts/{cart['id']}", headers=customer["headers"])
+    lines = await client.get(f"/api/v1/carts/{cart['id']}/items", headers=customer["headers"])
+    assert reloaded.status_code == 200
+    assert reloaded.json()["version"] == 2
+    assert len(lines.json()["items"]) == 1
+    quote = await post(client, f"/carts/{cart['id']}/quote", None, customer)
+    assert quote["total"] == "10.00"
+    assert quote["lines"][0]["product_name"] == "Integration product"
+    assert quote["lines"][0]["unit_price"] == "10.0000"
+    assert quote["lines"][0]["branch_name"] == "Integration branch"
+    assert quote["lines"][0]["window_starts_at"]
+    order = await post(
+        client,
+        "/orders/confirm",
+        {"quote_id": quote["id"]},
+        customer,
+        headers={"Idempotency-Key": uuid4().hex},
+    )
+    intent = await client.post(
+        "/api/v1/finance/sandbox/payment-intents",
+        json={"order_id": order["id"]},
+        headers=customer["headers"],
+    )
+    assert intent.status_code == 201 and intent.json()["status"] == "pending"
+    completed = await client.post(
+        f"/api/v1/finance/sandbox/payments/{intent.json()['id']}/complete",
+        headers=customer["headers"],
+    )
+    assert completed.status_code == 200 and completed.json()["status"] == "confirmed"
+    payment_status = await client.get(
+        f"/api/v1/orders/{order['id']}/payment", headers=customer["headers"]
+    )
+    assert payment_status.status_code == 200 and payment_status.json()["id"] == intent.json()["id"]
+    reorder = await client.get(
+        f"/api/v1/orders/{order['id']}/reorder-lines", headers=customer["headers"]
+    )
+    assert reorder.status_code == 200
+    assert reorder.json()[0]["variant_id"] == state["shops"][0]["variant"]["id"]
+
+    other_customer = await user(client, app)
+    denied_cart = await client.get(
+        f"/api/v1/carts/{cart['id']}", headers=other_customer["headers"]
+    )
+    assert denied_cart.status_code == 403
+    denied_payment = await client.post(
+        f"/api/v1/finance/sandbox/payments/{intent.json()['id']}/complete",
+        headers=other_customer["headers"],
+    )
+    assert denied_payment.status_code == 403
+    denied_order_payment = await client.get(
+        f"/api/v1/orders/{order['id']}/payment", headers=other_customer["headers"]
+    )
+    assert denied_order_payment.status_code == 403
+    denied_reorder = await client.get(
+        f"/api/v1/orders/{order['id']}/reorder-lines", headers=other_customer["headers"]
+    )
+    assert denied_reorder.status_code == 403
+
+
+async def test_merchant_workspace_branch_scope_queue_and_transitions(api):
+    client, app = api
+    state = await world(client, app, 2)
+    customer = state["customer"]
+    merchant_a, merchant_b = state["shops"]
+    _, _, order, _ = await checkout(client, customer, [merchant_a])
+    customer_children = await client.get(
+        f"/api/v1/orders/{order['id']}/merchant-orders", headers=customer["headers"]
+    )
+    child_id = customer_children.json()["items"][0]["id"]
+
+    branches = await client.get(
+        "/api/v1/merchant/branches", headers=merchant_a["merchant"]["headers"]
+    )
+    assert branches.status_code == 200
+    assert [row["id"] for row in branches.json()["items"]] == [merchant_a["branch"]["id"]]
+    current_branch = branches.json()["items"][0]
+    paused = await client.put(
+        f"/api/v1/merchant/branches/{merchant_a['branch']['id']}/availability",
+        json={"accepting_orders": False, "expected_version": current_branch["version"]},
+        headers=merchant_a["merchant"]["headers"],
+    )
+    assert paused.status_code == 200 and paused.json()["accepting_orders"] is False
+    stale_availability = await client.put(
+        f"/api/v1/merchant/branches/{merchant_a['branch']['id']}/availability",
+        json={"accepting_orders": True, "expected_version": current_branch["version"]},
+        headers=merchant_a["merchant"]["headers"],
+    )
+    assert stale_availability.status_code == 409
+    queue = await client.get(
+        f"/api/v1/merchant/branches/{merchant_a['branch']['id']}/orders",
+        headers=merchant_a["merchant"]["headers"],
+    )
+    assert queue.status_code == 200
+    assert len(queue.json()["items"]) == 1
+    assert queue.json()["items"][0]["id"] == child_id
+    assert queue.json()["items"][0]["items"][0]["product_name"] == "Integration product"
+    foreign_queue = await client.get(
+        f"/api/v1/merchant/branches/{merchant_b['branch']['id']}/orders",
+        headers=merchant_a["merchant"]["headers"],
+    )
+    assert foreign_queue.status_code == 403
+
+    catalog = await client.get(
+        f"/api/v1/merchant/branches/{merchant_a['branch']['id']}/catalog",
+        headers=merchant_a["merchant"]["headers"],
+    )
+    assert catalog.status_code == 200
+    assert catalog.json()["items"][0]["name"] == "Integration product"
+    assert catalog.json()["items"][0]["on_hand"] == "10.0000"
+    denied_catalog = await client.get(
+        f"/api/v1/merchant/branches/{merchant_b['branch']['id']}/catalog",
+        headers=merchant_a["merchant"]["headers"],
+    )
+    assert denied_catalog.status_code == 403
+
+    accepted = await client.post(
+        f"/api/v1/merchant-orders/{child_id}/transition",
+        json={"target": "accepted", "expected_version": 1},
+        headers=merchant_a["merchant"]["headers"],
+    )
+    assert accepted.status_code == 200 and accepted.json()["status"] == "accepted"
+    stale = await client.post(
+        f"/api/v1/merchant-orders/{child_id}/transition",
+        json={"target": "preparing", "expected_version": 1},
+        headers=merchant_a["merchant"]["headers"],
+    )
+    assert stale.status_code == 409
+
+    onboarding = await client.post(
+        "/api/v1/merchant/onboarding",
+        json={
+            "organization_name": "Atomic onboarding merchant",
+            "brand_name": "Atomic onboarding brand",
+            "merchant_type": "food",
+            "branch_name": "Atomic onboarding branch",
+            "city_id": state["city"]["id"],
+            "latitude": "17.385",
+            "longitude": "78.4867",
+        },
+        headers=merchant_b["merchant"]["headers"],
+    )
+    assert onboarding.status_code == 201
+    assert onboarding.json()["status"] == "pending"
+    assert onboarding.json()["accepting_orders"] is False
+    own_after_onboarding = await client.get(
+        "/api/v1/merchant/branches", headers=merchant_b["merchant"]["headers"]
+    )
+    assert onboarding.json()["id"] in {
+        row["id"] for row in own_after_onboarding.json()["items"]
+    }
+
+
+async def test_rejected_child_blocks_parent_sandbox_payment(api):
+    client, app = api
+    state = await world(client, app, 2)
+    _, _, order, _ = await checkout(client, state["customer"], state["shops"])
+    children = (
+        await client.get(
+            f"/api/v1/orders/{order['id']}/merchant-orders",
+            headers=state["customer"]["headers"],
+        )
+    ).json()["items"]
+    rejected = await post(
+        client,
+        f"/merchant-orders/{children[0]['id']}/transition",
+        {"target": "rejected", "expected_version": 1},
+        state["admin"],
+        200,
+    )
+    assert rejected["status"] == "rejected"
+    assert children[1]["status"] == "pending"
+    payment = await client.post(
+        "/api/v1/finance/sandbox/payment-intents",
+        json={"order_id": order["id"]},
+        headers=state["customer"]["headers"],
+    )
+    assert payment.status_code == 409
+    assert payment.json()["error"]["code"] == "revised_payment_required"
+    async with app.state.sessions() as db:
+        refreshed = (
+            await db.scalars(
+                select(m.MerchantOrder)
+                .where(m.MerchantOrder.order_id == UUID(order["id"]))
+                .order_by(m.MerchantOrder.id)
+            )
+        ).all()
+        assert {row.status for row in refreshed} == {"rejected", "pending"}
+        assert (
+            await db.scalar(
+                select(func.count())
+                .select_from(m.PaymentIntent)
+                .where(m.PaymentIntent.order_id == UUID(order["id"]))
+            )
+            == 0
+        )
 
 
 async def test_branch_hours_and_unserviceable_destination(api):
@@ -367,6 +653,25 @@ async def test_pilot_exclusive_accept_pickup_and_completion(api):
     for identity in identities:
         pilot = await post(client, "/pilots", {"city_id": state["city"]["id"]}, identity)
         await post(client, f"/pilots/{pilot['id']}/verify", None, state["admin"], 200)
+        consent = await client.post(
+            "/api/v1/pilots/me/location-consent",
+            json={"accepted": True, "policy_version": "pilot-location-v1"},
+            headers=identity["headers"],
+        )
+        assert consent.status_code == 200
+        location = await client.post(
+            "/api/v1/pilots/me/location",
+            json={
+                "latitude": "17.385",
+                "longitude": "78.4867",
+                "observed_at": now().isoformat(),
+                "accuracy_m": "8",
+                "client_sequence": 1,
+                "app_state": "foreground",
+            },
+            headers=identity["headers"],
+        )
+        assert location.status_code == 200 and location.json()["accepted"]
         available = await client.put(
             f"/api/v1/pilots/{pilot['id']}/availability",
             json={"available": True},
@@ -375,6 +680,33 @@ async def test_pilot_exclusive_accept_pickup_and_completion(api):
         assert available.status_code == 200
         pilots.append(pilot)
 
+    ai_dispatch_started = perf_counter()
+    recommendation = await client.post(
+        "/api/v1/ai/dispatch/optimize",
+        json={"city_id": state["city"]["id"], "task_ids": [task_id]},
+        headers=state["admin"]["headers"],
+    )
+    ai_dispatch_api_ms = round((perf_counter() - ai_dispatch_started) * 1000, 2)
+    assert recommendation.status_code == 200
+    assert recommendation.json()["committed"] is False
+    assert len(recommendation.json()["plan"]) == 1
+    assert recommendation.json()["constraint_checks"]["pilot_capacity"] is True
+    Path("docs/ai/dispatch-optimization-smoke.json").write_text(
+        json.dumps(
+            {
+                "scope": "local ASGI + PostgreSQL, one task/two pilot candidates",
+                "api_latency_ms": ai_dispatch_api_ms,
+                "algorithm_runtime_ms": recommendation.json()["runtime_ms"],
+                "plan_size": len(recommendation.json()["plan"]),
+                "committed": False,
+                "limitations": "single scenario; not a solver or fleet-scale benchmark",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
     async def offer(pilot):
         return await client.post(
             f"/api/v1/delivery-tasks/{task_id}/offer",
@@ -382,8 +714,25 @@ async def test_pilot_exclusive_accept_pickup_and_completion(api):
             headers=state["shops"][0]["merchant"]["headers"],
         )
 
+    dispatch_started = perf_counter()
     responses = await asyncio.gather(*(offer(pilot) for pilot in pilots))
+    dispatch_latency_ms = round((perf_counter() - dispatch_started) * 1000, 2)
     assert sorted(response.status_code for response in responses) == [201, 409]
+    Path("docs/performance/dispatch-offer-smoke.json").write_text(
+        json.dumps(
+            {
+                "scope": "local ASGI API + PostgreSQL, two concurrent pilot offer requests",
+                "concurrent_requests": len(responses),
+                "winner_and_conflict_latency_ms": dispatch_latency_ms,
+                "limitations": (
+                    "single task, two candidates, local test harness; not fleet-scale latency"
+                ),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     winner = next(i for i, r in enumerate(responses) if r.status_code == 201)
     assignment = responses[winner].json()
     wrong = await client.post(
@@ -612,7 +961,7 @@ async def test_pagination_validation_and_fresh_migration(api):
     invalid_cursor = await client.get("/api/v1/orders?cursor=invalid", headers=identity["headers"])
     assert invalid_cursor.status_code == 422
     async with app.state.sessions() as db:
-        assert await db.scalar(text("SELECT version_num FROM alembic_version")) == "20261026_0005"
+        assert await db.scalar(text("SELECT version_num FROM alembic_version")) == "20261026_0010"
         count = await db.scalar(
             text(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema IN "

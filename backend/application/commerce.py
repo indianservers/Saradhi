@@ -23,6 +23,17 @@ async def serviceable(session, branch, window, method, address, category_id):
     if window.branch_id != branch.id or window.ends_at <= now() or window.starts_at < now():
         raise BusinessError("invalid_window", "A future window for this branch is required")
     local = instant.astimezone(ZoneInfo(city.timezone))
+    Calendar, Holiday = F["geo.operating_calendars"], F["geo.holidays"]
+    if await session.scalar(
+        select(Holiday.id)
+        .join(Calendar)
+        .where(
+            Calendar.city_id == city.id,
+            Holiday.local_date == local.date(),
+            Holiday.closed.is_(True),
+        )
+    ):
+        raise BusinessError("city_holiday", "City operations are closed for this local date")
     hours = (
         await session.scalars(
             select(m.OperatingHour).where(
@@ -500,12 +511,12 @@ async def release_reservation(session, reservation, actor_id, request_id):
     # Caller must hold the reservation row lock. Atomic transition prevents double release.
     if reservation.status != "reserved":
         return
-    await batches.finish(session, reservation)
     await session.execute(
         update(m.Stock)
         .where(m.Stock.id == reservation.stock_id)
         .values(reserved=m.Stock.reserved - reservation.quantity, version=m.Stock.version + 1)
     )
+    await batches.finish(session, reservation)
     reservation.status = "released"
     await add(
         session,
@@ -521,8 +532,12 @@ async def release_reservation(session, reservation, actor_id, request_id):
 
 
 async def merchant_transition(session, actor, child_id, target, version, request_id):
+    candidate = await Repository(session).require(m.MerchantOrder, child_id)
+    branch = await branch_scope(session, actor, candidate.branch_id)
+    order = await Repository(session).require(m.Order, candidate.order_id, lock=True)
     child = await Repository(session).require(m.MerchantOrder, child_id, lock=True)
-    branch = await branch_scope(session, actor, child.branch_id)
+    if order.status != "confirmed":
+        raise BusinessError("invalid_order", "Parent order is no longer active")
     if child.version != version:
         raise BusinessError("version_conflict", "Expected version does not match")
     transition("merchant", child.status, target)
@@ -541,13 +556,6 @@ async def merchant_transition(session, actor, child_id, target, version, request
                 "reservation_expired", "Inventory reservation expired; order must be requoted"
             )
         for reservation in reservations:
-            city = await session.get(m.City, branch.city_id)
-            await batches.finish(
-                session,
-                reservation,
-                consume=True,
-                at_date=now().astimezone(ZoneInfo(city.timezone)).date(),
-            )
             await session.execute(
                 update(m.Stock)
                 .where(m.Stock.id == reservation.stock_id)
@@ -556,6 +564,13 @@ async def merchant_transition(session, actor, child_id, target, version, request
                     reserved=m.Stock.reserved - reservation.quantity,
                     version=m.Stock.version + 1,
                 )
+            )
+            city = await session.get(m.City, branch.city_id)
+            await batches.finish(
+                session,
+                reservation,
+                consume=True,
+                at_date=now().astimezone(ZoneInfo(city.timezone)).date(),
             )
             reservation.status = "confirmed"
             await add(
@@ -620,7 +635,15 @@ async def merchant_transition(session, actor, child_id, target, version, request
         current=target,
         actor_id=UUID(actor.subject),
     )
-    await event(session, f"merchant_order.{target}", child.id, request_id, order_id=child.order_id)
+    await event(
+        session,
+        f"merchant_order.{target}",
+        child.id,
+        request_id,
+        order_id=child.order_id,
+        organization_id=branch.organization_id,
+        city_id=branch.city_id,
+    )
     await audit(
         session,
         actor,

@@ -1,0 +1,3 @@
+# WebSocket events
+
+The gateway uses scoped short-lived tickets, resource authorization, Redis Pub/Sub fan-out, bounded payloads, heartbeats, connection quotas and periodic permission checks. Event envelopes carry event IDs and sequence metadata; business events are persisted in the transactional outbox and snapshots are recovered through REST. Clients should reconnect with exponential backoff (for example 0.5, 1, 2, 4 seconds capped at 30 seconds with jitter), then fetch the authoritative snapshot before applying newer events. Redis is unavailable locally; cross-instance behavior therefore remains unverified.

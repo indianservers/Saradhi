@@ -2,6 +2,10 @@
 .env
 .env.*
 .venv
+.local
+.secrets
+*.pem
+*.key
 node_modules
 apps
 database/backups

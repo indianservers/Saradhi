@@ -29,18 +29,23 @@ def main():
                 else "Public transport; endpoint-specific rate/provider verification applies."
             )
             lines.append(
-                f"- `{method.upper()} {path}` — {value.get('summary', value['operationId'])}. {auth}"
+                f"- `{method.upper()} {path}` — "
+                f"{value.get('summary', value['operationId'])}. {auth}"
             )
             count += 1
     lines += [
         "",
         "## Verification",
         "",
-        "Use sample-requests.ps1 explicitly for registration/login, cart/checkout, merchant, pilot and support requests.",
-        "No default privileged account exists. Provision only a named existing user via the local operator CLI.",
+        "Use sample-requests.ps1 explicitly for registration/login, cart/checkout, "
+        "merchant, pilot and support requests.",
+        "No default privileged account exists. "
+        "Provision only a named existing user via the local operator CLI.",
         "Complete real-database examples: tests/integration/helpers.py and test_vertical_slice.py.",
-        "See api-security.md and error-contracts.md for authorization, precision, state and error behavior.",
-        "Sandbox finance requires explicit enabling and never performs a real financial transaction.",
+        "See api-security.md and error-contracts.md for authorization, precision, "
+        "state and error behavior.",
+        "Sandbox finance requires explicit enabling "
+        "and never performs a real financial transaction.",
         f"Total documented HTTP operations: {count}.",
     ]
     (ROOT / "docs/api/api-reference.md").write_text("\n".join(lines) + "\n", encoding="utf-8")

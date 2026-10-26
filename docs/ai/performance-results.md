@@ -1,0 +1,5 @@
+# AI performance and test results
+
+The AI algorithms are CPU-only standard-library code. Demand extraction is a bounded 28-day aggregate query; dispatch recommendations are capped at 50 tasks and 500 fresh pilot candidates. Forecast and decision persistence use the separate `intelligence` schema. Checkout does not invoke AI synchronously. A one-task/two-candidate local API smoke measured 33.52 ms end-to-end and 0 ms integer algorithm runtime in the recorded run; the integer runtime rounds sub-millisecond work down. Evidence is in `dispatch-optimization-smoke.json`; this is not a capacity benchmark.
+
+The AI baseline unit and API scenarios are recorded in the Phase 2.C test run. No long-running model, GPU, MLflow service or OR-Tools solver is installed. No inference throughput, memory, model accuracy, drift, or fleet-scale optimization benchmark is claimed. The 30-GPS and two-offer measurements in `docs/performance/gps-load-tests.md` are Phase 2.B functional smoke samples, not AI capacity tests.

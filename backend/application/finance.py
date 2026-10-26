@@ -144,6 +144,16 @@ async def payment_intent(session, actor, order_id, gateway):
     owned(actor, order.user_id)
     if order.status != "confirmed":
         raise BusinessError("invalid_order", "Order is not payable")
+    rejected = await session.scalar(
+        select(m.MerchantOrder.id).where(
+            m.MerchantOrder.order_id == order.id,
+            m.MerchantOrder.status.in_(["rejected", "cancelled"]),
+        )
+    )
+    if rejected:
+        raise BusinessError(
+            "revised_payment_required", "Partial rejection requires revised payment allocations"
+        )
     existing = await session.scalar(
         select(m.PaymentIntent).where(
             m.PaymentIntent.order_id == order.id, m.PaymentIntent.provider == "sandbox"
@@ -181,6 +191,16 @@ async def webhook(session, gateway, payload, signature, request_id):
         return payment
     if order.status != "confirmed" and payment.status != "confirmed":
         raise BusinessError("invalid_order", "Payment cannot confirm a cancelled order")
+    if payment.status == "pending" and await session.scalar(
+        select(m.MerchantOrder.id).where(
+            m.MerchantOrder.order_id == order.id,
+            m.MerchantOrder.status.in_(["rejected", "cancelled"]),
+        )
+    ):
+        raise BusinessError(
+            "revised_payment_required",
+            "Rejected merchant orders require revised payment allocation",
+        )
     if (
         payment.provider != "sandbox"
         or payment.currency != data["currency"]

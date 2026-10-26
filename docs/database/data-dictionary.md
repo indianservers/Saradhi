@@ -170,6 +170,8 @@ Indexes: [].
 - `correlation_id`: TEXT; required.
 - `attempts`: INTEGER; required.
 - `available_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `claim_token`: UUID; nullable.
+- `claim_expires_at`: TIMESTAMP WITH TIME ZONE; nullable.
 - `delivered_at`: TIMESTAMP WITH TIME ZONE; nullable.
 - `dead_lettered_at`: TIMESTAMP WITH TIME ZONE; nullable.
 - `id`: UUID; required; PK.
@@ -177,7 +179,7 @@ Indexes: [].
 - `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 
 Constraints: [{"name": "pk_outbox_events", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_outbox_pending", "columns": ["available_at"], "unique": false, "predicate": "delivered_at IS NULL AND dead_lettered_at IS NULL"}].
+Indexes: [{"name": "ix_outbox_claimable", "columns": ["available_at", "claim_expires_at", "id"], "unique": false, "predicate": "delivered_at IS NULL AND dead_lettered_at IS NULL"}, {"name": "ix_outbox_pending", "columns": ["available_at"], "unique": false, "predicate": "delivered_at IS NULL AND dead_lettered_at IS NULL"}].
 
 ## intelligence.ai_feature_definitions
 
@@ -189,6 +191,20 @@ Indexes: [{"name": "ix_outbox_pending", "columns": ["available_at"], "unique": f
 - `privacy_class`: TEXT; required.
 
 Constraints: [{"name": "pk_ai_feature_definitions", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [].
+
+## intelligence.ai_feature_pipeline_runs
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `feature_schema_version`: TEXT; required.
+- `source_cutoff`: TIMESTAMP WITH TIME ZONE; required.
+- `row_count`: INTEGER; required.
+- `quality`: JSONB; required.
+- `status`: TEXT; required.
+
+Constraints: [{"name": "ck_ai_feature_pipeline_runs_rule_0", "type": "CheckConstraint", "sql": "row_count >= 0", "columns": []}, {"name": "ck_ai_feature_pipeline_runs_rule_1", "type": "CheckConstraint", "sql": "status IN ('succeeded','failed','partial')", "columns": []}, {"name": "pk_ai_feature_pipeline_runs", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [].
 
 ## intelligence.ai_model_registry
@@ -359,18 +375,18 @@ Indexes: [{"name": "ix_tax_codes_country_id", "columns": ["country_id"], "unique
 Constraints: [{"name": "fk_recurring_order_plans_user_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["user_id"]}, {"name": "pk_recurring_order_plans", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_recurring_order_plans_user_id", "columns": ["user_id"], "unique": false, "predicate": "None"}].
 
-## geo.cities
+## fulfillment.tracking_ws_tickets
 
-- `country_id`: UUID; required; FK → geo.countries.id (RESTRICT).
-- `name`: TEXT; required.
-- `timezone`: TEXT; required.
-- `active`: BOOLEAN; required.
 - `id`: UUID; required; PK.
 - `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 - `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `user_id`: UUID; required; FK → identity.users.id (RESTRICT).
+- `token_hash`: TEXT; required.
+- `expires_at`: TIMESTAMP WITH TIME ZONE; required.
+- `consumed_at`: TIMESTAMP WITH TIME ZONE; nullable.
 
-Constraints: [{"name": "fk_cities_country_id_countries", "type": "ForeignKeyConstraint", "sql": null, "columns": ["country_id"]}, {"name": "pk_cities", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_cities_country_id", "type": "UniqueConstraint", "sql": null, "columns": ["country_id", "name"]}].
-Indexes: [].
+Constraints: [{"name": "fk_tracking_ws_tickets_user_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["user_id"]}, {"name": "pk_tracking_ws_tickets", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_tracking_ws_tickets_token_hash", "type": "UniqueConstraint", "sql": null, "columns": ["token_hash"]}].
+Indexes: [{"name": "ix_tracking_ws_tickets_user_id", "columns": ["user_id"], "unique": false, "predicate": "None"}].
 
 ## geo.service_regions
 
@@ -552,9 +568,37 @@ Indexes: [{"name": "ix_ai_feature_snapshots_feature_id", "columns": ["feature_id
 - `version`: TEXT; required.
 - `artifact_reference`: TEXT; required.
 - `approved_by`: UUID; nullable; FK → identity.users.id (RESTRICT).
+- `algorithm`: TEXT; required.
+- `training_code_version`: TEXT; required.
+- `dataset_reference`: TEXT; nullable.
+- `feature_schema_version`: TEXT; required.
+- `trained_at`: TIMESTAMP WITH TIME ZONE; nullable.
+- `metrics`: JSONB; required.
+- `artifact_checksum`: TEXT; nullable.
+- `validation_passed`: BOOLEAN; required.
+- `status`: TEXT; required.
 
 Constraints: [{"name": "fk_ai_model_versions_approved_by_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["approved_by"]}, {"name": "fk_ai_model_versions_model_id_ai_model_registry", "type": "ForeignKeyConstraint", "sql": null, "columns": ["model_id"]}, {"name": "pk_ai_model_versions", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_ai_model_versions_approved_by", "columns": ["approved_by"], "unique": false, "predicate": "None"}, {"name": "ix_ai_model_versions_model_id", "columns": ["model_id"], "unique": false, "predicate": "None"}].
+
+## intelligence.ai_training_jobs
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `model_id`: UUID; required; FK → intelligence.ai_model_registry.id (RESTRICT).
+- `status`: TEXT; required.
+- `dataset_reference`: TEXT; required.
+- `sample_count`: INTEGER; required.
+- `code_version`: TEXT; required.
+- `feature_schema_version`: TEXT; required.
+- `metrics`: JSONB; required.
+- `started_at`: TIMESTAMP WITH TIME ZONE; nullable.
+- `finished_at`: TIMESTAMP WITH TIME ZONE; nullable.
+- `error_code`: TEXT; nullable.
+
+Constraints: [{"name": "ck_ai_training_jobs_rule_0", "type": "CheckConstraint", "sql": "sample_count >= 0", "columns": []}, {"name": "ck_ai_training_jobs_rule_1", "type": "CheckConstraint", "sql": "status IN ('queued','running','succeeded','failed','cancelled')", "columns": []}, {"name": "ck_ai_training_jobs_rule_2", "type": "CheckConstraint", "sql": "(started_at IS NULL) = (status = 'queued')", "columns": []}, {"name": "fk_ai_training_jobs_model_id_ai_model_registry", "type": "ForeignKeyConstraint", "sql": null, "columns": ["model_id"]}, {"name": "pk_ai_training_jobs", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_ai_training_jobs_model_id", "columns": ["model_id"], "unique": false, "predicate": "None"}].
 
 ## operations.notification_jobs
 
@@ -777,20 +821,6 @@ Indexes: [{"name": "ix_billing_documents_organization_id", "columns": ["organiza
 Constraints: [{"name": "fk_commission_rules_category_id_product_categories", "type": "ForeignKeyConstraint", "sql": null, "columns": ["category_id"]}, {"name": "fk_commission_rules_organization_id_organizations", "type": "ForeignKeyConstraint", "sql": null, "columns": ["organization_id"]}, {"name": "pk_commission_rules", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_commission_rules_category_id", "columns": ["category_id"], "unique": false, "predicate": "None"}, {"name": "ix_commission_rules_organization_id", "columns": ["organization_id"], "unique": false, "predicate": "None"}].
 
-## finance.fee_rules
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
-- `currency_id`: UUID; required; FK → finance.currencies.id (RESTRICT).
-- `name`: TEXT; required.
-- `amount`: NUMERIC(20, 4); required.
-- `starts_at`: TIMESTAMP WITH TIME ZONE; required.
-
-Constraints: [{"name": "fk_fee_rules_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "fk_fee_rules_currency_id_currencies", "type": "ForeignKeyConstraint", "sql": null, "columns": ["currency_id"]}, {"name": "pk_fee_rules", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_fee_rules_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}, {"name": "ix_fee_rules_currency_id", "columns": ["currency_id"], "unique": false, "predicate": "None"}].
-
 ## finance.ledger_posting_batches
 
 - `id`: UUID; required; PK.
@@ -831,33 +861,6 @@ Indexes: [{"name": "ix_ledger_reconciliation_results_currency_id", "columns": ["
 Constraints: [{"name": "fk_settlement_batches_currency_id_currencies", "type": "ForeignKeyConstraint", "sql": null, "columns": ["currency_id"]}, {"name": "fk_settlement_batches_organization_id_organizations", "type": "ForeignKeyConstraint", "sql": null, "columns": ["organization_id"]}, {"name": "pk_settlement_batches", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_settlement_batches_currency_id", "columns": ["currency_id"], "unique": false, "predicate": "None"}, {"name": "ix_settlement_batches_organization_id", "columns": ["organization_id"], "unique": false, "predicate": "None"}].
 
-## finance.tax_rules
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `tax_code_id`: UUID; required; FK → finance.tax_codes.id (RESTRICT).
-- `city_id`: UUID; nullable; FK → geo.cities.id (RESTRICT).
-- `rate`: NUMERIC(20, 4); required.
-- `starts_at`: TIMESTAMP WITH TIME ZONE; required.
-- `ends_at`: TIMESTAMP WITH TIME ZONE; nullable.
-
-Constraints: [{"name": "fk_tax_rules_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "fk_tax_rules_tax_code_id_tax_codes", "type": "ForeignKeyConstraint", "sql": null, "columns": ["tax_code_id"]}, {"name": "pk_tax_rules", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_tax_rules_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}, {"name": "ix_tax_rules_tax_code_id", "columns": ["tax_code_id"], "unique": false, "predicate": "None"}].
-
-## fulfillment.pilot_profiles
-
-- `user_id`: UUID; required; FK → identity.users.id (RESTRICT).
-- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
-- `verified`: BOOLEAN; required.
-- `available`: BOOLEAN; required.
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-
-Constraints: [{"name": "fk_pilot_profiles_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "fk_pilot_profiles_user_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["user_id"]}, {"name": "pk_pilot_profiles", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_pilot_profiles_user_id", "type": "UniqueConstraint", "sql": null, "columns": ["user_id"]}].
-Indexes: [{"name": "ix_pilot_profiles_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
-
 ## fulfillment.recurrence_exceptions
 
 - `id`: UUID; required; PK.
@@ -885,55 +888,19 @@ Indexes: [{"name": "ix_recurrence_exceptions_plan_id", "columns": ["plan_id"], "
 Constraints: [{"name": "ck_recurring_order_rules_rule_0", "type": "CheckConstraint", "sql": "interval > 0", "columns": []}, {"name": "fk_recurring_order_rules_plan_id_recurring_order_plans", "type": "ForeignKeyConstraint", "sql": null, "columns": ["plan_id"]}, {"name": "pk_recurring_order_rules", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_recurring_order_rules_plan_id", "columns": ["plan_id"], "unique": false, "predicate": "None"}].
 
-## geo.addresses
+## geo.cities
 
-- `user_id`: UUID; required; FK → identity.users.id (RESTRICT).
-- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
-- `label`: TEXT; required.
-- `address_text`: TEXT; required.
-- `latitude`: NUMERIC(10, 7); required.
-- `longitude`: NUMERIC(10, 7); required.
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-
-Constraints: [{"name": "ck_addresses_coordinates", "type": "CheckConstraint", "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180", "columns": []}, {"name": "fk_addresses_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "fk_addresses_user_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["user_id"]}, {"name": "pk_addresses", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_addresses_user_id", "columns": ["user_id"], "unique": false, "predicate": "None"}].
-
-## geo.operating_calendars
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `country_id`: UUID; required; FK → geo.countries.id (RESTRICT).
+- `state_province_id`: UUID; nullable; FK → geo.states_provinces.id (RESTRICT).
 - `name`: TEXT; required.
 - `timezone`: TEXT; required.
-
-Constraints: [{"name": "fk_operating_calendars_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_operating_calendars", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_operating_calendars_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
-
-## geo.postal_codes
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
-- `code`: TEXT; required.
-
-Constraints: [{"name": "fk_postal_codes_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_postal_codes", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_postal_codes_city_id", "type": "UniqueConstraint", "sql": null, "columns": ["city_id", "code"]}].
-Indexes: [{"name": "ix_postal_codes_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
-
-## geo.service_zones
-
-- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
-- `name`: TEXT; required.
 - `active`: BOOLEAN; required.
 - `id`: UUID; required; PK.
 - `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 - `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 
-Constraints: [{"name": "fk_service_zones_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_service_zones", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_service_zones_city_id", "type": "UniqueConstraint", "sql": null, "columns": ["city_id", "name"]}].
-Indexes: [{"name": "ix_service_zones_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
+Constraints: [{"name": "fk_cities_country_id_countries", "type": "ForeignKeyConstraint", "sql": null, "columns": ["country_id"]}, {"name": "fk_cities_state_province_id_states_provinces", "type": "ForeignKeyConstraint", "sql": null, "columns": ["state_province_id"]}, {"name": "pk_cities", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_cities_country_id", "type": "UniqueConstraint", "sql": null, "columns": ["country_id", "name"]}].
+Indexes: [].
 
 ## identity.authentication_events
 
@@ -1124,19 +1091,6 @@ Indexes: [{"name": "ix_notification_attempts_job_id", "columns": ["job_id"], "un
 Constraints: [{"name": "fk_notification_deliveries_job_id_notification_jobs", "type": "ForeignKeyConstraint", "sql": null, "columns": ["job_id"]}, {"name": "pk_notification_deliveries", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_notification_deliveries_job_id", "columns": ["job_id"], "unique": false, "predicate": "None"}].
 
-## operations.operational_incidents
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
-- `severity`: TEXT; required.
-- `summary`: TEXT; required.
-- `status`: TEXT; required.
-
-Constraints: [{"name": "fk_operational_incidents_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_operational_incidents", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_operational_incidents_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
-
 ## catalog.dietary_attributes
 
 - `id`: UUID; required; PK.
@@ -1311,6 +1265,20 @@ Indexes: [{"name": "ix_coupons_campaign_id", "columns": ["campaign_id"], "unique
 Constraints: [{"name": "fk_subscription_billing_events_subscription_id_customer_subscriptions", "type": "ForeignKeyConstraint", "sql": null, "columns": ["subscription_id"]}, {"name": "pk_subscription_billing_events", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_subscription_billing_events_subscription_id", "type": "UniqueConstraint", "sql": null, "columns": ["subscription_id", "period_start"]}].
 Indexes: [{"name": "ix_subscription_billing_events_subscription_id", "columns": ["subscription_id"], "unique": false, "predicate": "None"}].
 
+## finance.fee_rules
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `currency_id`: UUID; required; FK → finance.currencies.id (RESTRICT).
+- `name`: TEXT; required.
+- `amount`: NUMERIC(20, 4); required.
+- `starts_at`: TIMESTAMP WITH TIME ZONE; required.
+
+Constraints: [{"name": "fk_fee_rules_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "fk_fee_rules_currency_id_currencies", "type": "ForeignKeyConstraint", "sql": null, "columns": ["currency_id"]}, {"name": "pk_fee_rules", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_fee_rules_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}, {"name": "ix_fee_rules_currency_id", "columns": ["currency_id"], "unique": false, "predicate": "None"}].
+
 ## finance.ledger_books
 
 - `organization_id`: UUID; required; FK → identity.organizations.id (RESTRICT).
@@ -1336,241 +1304,100 @@ Indexes: [].
 Constraints: [{"name": "fk_payout_requests_batch_id_settlement_batches", "type": "ForeignKeyConstraint", "sql": null, "columns": ["batch_id"]}, {"name": "pk_payout_requests", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_payout_requests_idempotency_key", "type": "UniqueConstraint", "sql": null, "columns": ["idempotency_key"]}].
 Indexes: [{"name": "ix_payout_requests_batch_id", "columns": ["batch_id"], "unique": false, "predicate": "None"}].
 
-## fulfillment.delivery_routes
+## finance.tax_rules
 
 - `id`: UUID; required; PK.
 - `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 - `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `status`: TEXT; required.
-
-Constraints: [{"name": "fk_delivery_routes_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_delivery_routes", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_delivery_routes_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
-
-## fulfillment.pilot_availability
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `available`: BOOLEAN; required.
-- `changed_at`: TIMESTAMP WITH TIME ZONE; required.
-
-Constraints: [{"name": "fk_pilot_availability_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_availability", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_availability_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
-
-## fulfillment.pilot_capabilities
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `capability`: TEXT; required.
-- `expires_at`: TIMESTAMP WITH TIME ZONE; nullable.
-
-Constraints: [{"name": "fk_pilot_capabilities_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_capabilities", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_capabilities_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
-
-## fulfillment.pilot_documents
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `document_type`: TEXT; required.
-- `private_object_key`: TEXT; required.
-- `expires_at`: TIMESTAMP WITH TIME ZONE; nullable.
-
-Constraints: [{"name": "fk_pilot_documents_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_documents", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_documents_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
-
-## fulfillment.pilot_incentives
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `currency_id`: UUID; required; FK → finance.currencies.id (RESTRICT).
-- `amount`: NUMERIC(20, 4); required.
-- `policy_reference`: TEXT; required.
-
-Constraints: [{"name": "fk_pilot_incentives_currency_id_currencies", "type": "ForeignKeyConstraint", "sql": null, "columns": ["currency_id"]}, {"name": "fk_pilot_incentives_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_incentives", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_incentives_currency_id", "columns": ["currency_id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_incentives_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
-
-## fulfillment.pilot_latest_location
-
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `latitude`: NUMERIC(10, 7); required.
-- `longitude`: NUMERIC(10, 7); required.
-- `observed_at`: TIMESTAMP WITH TIME ZONE; required.
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-
-Constraints: [{"name": "ck_pilot_latest_location_location_coordinates", "type": "CheckConstraint", "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180", "columns": []}, {"name": "fk_pilot_latest_location_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_latest_location", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_pilot_latest_location_pilot_id", "type": "UniqueConstraint", "sql": null, "columns": ["pilot_id"]}].
-Indexes: [].
-
-## fulfillment.pilot_location_events
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `latitude`: NUMERIC(20, 4); required.
-- `longitude`: NUMERIC(20, 4); required.
-- `observed_at`: TIMESTAMP WITH TIME ZONE; required.
-- `expires_at`: TIMESTAMP WITH TIME ZONE; required.
-
-Constraints: [{"name": "fk_pilot_location_events_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_location_events", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_history_retention", "columns": ["expires_at", "id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_history_subject_time", "columns": ["pilot_id", "observed_at", "id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_location_events_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
-
-## fulfillment.pilot_service_zones
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
-
-Constraints: [{"name": "fk_pilot_service_zones_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "fk_pilot_service_zones_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_pilot_service_zones", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_service_zones_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_service_zones_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
-
-## fulfillment.pilot_shifts
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `tax_code_id`: UUID; required; FK → finance.tax_codes.id (RESTRICT).
+- `city_id`: UUID; nullable; FK → geo.cities.id (RESTRICT).
+- `rate`: NUMERIC(20, 4); required.
 - `starts_at`: TIMESTAMP WITH TIME ZONE; required.
-- `ends_at`: TIMESTAMP WITH TIME ZONE; required.
+- `ends_at`: TIMESTAMP WITH TIME ZONE; nullable.
 
-Constraints: [{"name": "fk_pilot_shifts_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_shifts", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_shifts_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
+Constraints: [{"name": "fk_tax_rules_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "fk_tax_rules_tax_code_id_tax_codes", "type": "ForeignKeyConstraint", "sql": null, "columns": ["tax_code_id"]}, {"name": "pk_tax_rules", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_tax_rules_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}, {"name": "ix_tax_rules_tax_code_id", "columns": ["tax_code_id"], "unique": false, "predicate": "None"}].
 
-## fulfillment.pilot_status_history
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `previous`: TEXT; required.
-- `current`: TEXT; required.
-- `actor_id`: UUID; required; FK → identity.users.id (RESTRICT).
-
-Constraints: [{"name": "fk_pilot_status_history_actor_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["actor_id"]}, {"name": "fk_pilot_status_history_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_status_history", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_status_history_actor_id", "columns": ["actor_id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_status_history_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
-
-## fulfillment.pilot_vehicles
+## fulfillment.dispatch_policies
 
 - `id`: UUID; required; PK.
 - `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 - `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `vehicle_type`: TEXT; required.
-- `registration_token`: TEXT; required.
-
-Constraints: [{"name": "fk_pilot_vehicles_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_vehicles", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_vehicles_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
-
-## geo.delivery_service_areas
-
-- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
-- `name`: TEXT; required.
-- `spatial_ready`: BOOLEAN; required; default false.
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-
-Constraints: [{"name": "fk_delivery_service_areas_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_delivery_service_areas", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_delivery_service_areas_id", "type": "UniqueConstraint", "sql": null, "columns": ["id", "zone_id"]}].
-Indexes: [{"name": "ix_delivery_service_areas_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
-
-## geo.geo_locations
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `address_id`: UUID; required; FK → geo.addresses.id (RESTRICT).
-- `latitude`: NUMERIC(20, 4); required.
-- `longitude`: NUMERIC(20, 4); required.
-- `source`: TEXT; required.
-
-Constraints: [{"name": "ck_geo_locations_rule_0", "type": "CheckConstraint", "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180", "columns": []}, {"name": "fk_geo_locations_address_id_addresses", "type": "ForeignKeyConstraint", "sql": null, "columns": ["address_id"]}, {"name": "pk_geo_locations", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_geo_locations_address_id", "columns": ["address_id"], "unique": false, "predicate": "None"}].
-
-## geo.holidays
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `calendar_id`: UUID; required; FK → geo.operating_calendars.id (RESTRICT).
-- `local_date`: DATE; required.
-- `closed`: BOOLEAN; required.
-- `name`: TEXT; required.
-
-Constraints: [{"name": "fk_holidays_calendar_id_operating_calendars", "type": "ForeignKeyConstraint", "sql": null, "columns": ["calendar_id"]}, {"name": "pk_holidays", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_holidays_calendar_id", "type": "UniqueConstraint", "sql": null, "columns": ["calendar_id", "local_date"]}].
-Indexes: [{"name": "ix_holidays_calendar_id", "columns": ["calendar_id"], "unique": false, "predicate": "None"}].
-
-## geo.zone_boundaries
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
-- `revision`: INTEGER; required.
-- `effective_at`: TIMESTAMP WITH TIME ZONE; required.
-- `object_key`: TEXT; required.
-
-Constraints: [{"name": "fk_zone_boundaries_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_boundaries", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_zone_boundaries_zone_id", "type": "UniqueConstraint", "sql": null, "columns": ["zone_id", "revision"]}].
-Indexes: [{"name": "ix_zone_boundaries_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
-
-## geo.zone_capacity_settings
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
-- `maximum_active_tasks`: INTEGER; required.
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
 - `version`: INTEGER; required.
-
-Constraints: [{"name": "ck_zone_capacity_settings_rule_0", "type": "CheckConstraint", "sql": "maximum_active_tasks > 0", "columns": []}, {"name": "fk_zone_capacity_settings_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_capacity_settings", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_zone_capacity_settings_zone_id", "type": "UniqueConstraint", "sql": null, "columns": ["zone_id"]}].
-Indexes: [{"name": "ix_zone_capacity_settings_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
-
-## geo.zone_delivery_policies
-
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
-- `delivery_method`: TEXT; required.
-- `maximum_distance_m`: INTEGER; required.
+- `weights`: JSONB; required.
 - `active`: BOOLEAN; required.
 
-Constraints: [{"name": "ck_zone_delivery_policies_rule_0", "type": "CheckConstraint", "sql": "maximum_distance_m > 0", "columns": []}, {"name": "fk_zone_delivery_policies_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_delivery_policies", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_zone_delivery_policies_zone_id", "type": "UniqueConstraint", "sql": null, "columns": ["zone_id", "delivery_method"]}].
-Indexes: [{"name": "ix_zone_delivery_policies_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
+Constraints: [{"name": "fk_dispatch_policies_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_dispatch_policies", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_dispatch_policies_city_id", "type": "UniqueConstraint", "sql": null, "columns": ["city_id", "version"]}].
+Indexes: [{"name": "ix_dispatch_policies_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
 
-## geo.zone_operating_hours
+## fulfillment.pilot_profiles
 
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
-- `weekday`: INTEGER; required.
-- `opens_at`: TIME WITHOUT TIME ZONE; required.
-- `closes_at`: TIME WITHOUT TIME ZONE; required.
-
-Constraints: [{"name": "ck_zone_operating_hours_rule_0", "type": "CheckConstraint", "sql": "weekday BETWEEN 0 AND 6", "columns": []}, {"name": "ck_zone_operating_hours_rule_1", "type": "CheckConstraint", "sql": "opens_at < closes_at", "columns": []}, {"name": "fk_zone_operating_hours_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_operating_hours", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_zone_operating_hours_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
-
-## geo.zone_service_categories
-
-- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
-- `category_id`: UUID; required; FK → catalog.product_categories.id (RESTRICT).
-- `enabled`: BOOLEAN; required.
+- `user_id`: UUID; required; FK → identity.users.id (RESTRICT).
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `verified`: BOOLEAN; required.
+- `available`: BOOLEAN; required.
+- `state`: TEXT; required; default offline.
+- `max_active_tasks`: INTEGER; required; default 1.
+- `vehicle_type`: TEXT; required; default bike.
+- `location_consent_at`: TIMESTAMP WITH TIME ZONE; nullable.
+- `location_consent_version`: TEXT; nullable.
 - `id`: UUID; required; PK.
 - `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 - `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 
-Constraints: [{"name": "fk_zone_service_categories_category_id_product_categories", "type": "ForeignKeyConstraint", "sql": null, "columns": ["category_id"]}, {"name": "fk_zone_service_categories_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_service_categories", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_zone_service_categories_zone_id", "type": "UniqueConstraint", "sql": null, "columns": ["zone_id", "category_id"]}].
-Indexes: [{"name": "ix_zone_service_categories_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
+Constraints: [{"name": "ck_pilot_profiles_pilot_location_consent_pair", "type": "CheckConstraint", "sql": "(location_consent_at IS NULL) = (location_consent_version IS NULL)", "columns": []}, {"name": "ck_pilot_profiles_pilot_state", "type": "CheckConstraint", "sql": "state IN ('offline','online_available','offer_pending','assigned','on_break','unavailable','suspended')", "columns": []}, {"name": "ck_pilot_profiles_pilot_task_capacity", "type": "CheckConstraint", "sql": "max_active_tasks BETWEEN 1 AND 5", "columns": []}, {"name": "fk_pilot_profiles_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "fk_pilot_profiles_user_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["user_id"]}, {"name": "pk_pilot_profiles", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_pilot_profiles_user_id", "type": "UniqueConstraint", "sql": null, "columns": ["user_id"]}].
+Indexes: [{"name": "ix_pilot_profiles_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
+
+## geo.addresses
+
+- `user_id`: UUID; required; FK → identity.users.id (RESTRICT).
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `label`: TEXT; required.
+- `address_text`: TEXT; required.
+- `latitude`: NUMERIC(10, 7); required.
+- `longitude`: NUMERIC(10, 7); required.
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+
+Constraints: [{"name": "ck_addresses_coordinates", "type": "CheckConstraint", "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180", "columns": []}, {"name": "fk_addresses_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "fk_addresses_user_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["user_id"]}, {"name": "pk_addresses", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_addresses_user_id", "columns": ["user_id"], "unique": false, "predicate": "None"}].
+
+## geo.operating_calendars
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `name`: TEXT; required.
+- `timezone`: TEXT; required.
+
+Constraints: [{"name": "fk_operating_calendars_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_operating_calendars", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_operating_calendars_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
+
+## geo.postal_codes
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `code`: TEXT; required.
+
+Constraints: [{"name": "fk_postal_codes_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_postal_codes", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_postal_codes_city_id", "type": "UniqueConstraint", "sql": null, "columns": ["city_id", "code"]}].
+Indexes: [{"name": "ix_postal_codes_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
+
+## geo.service_zones
+
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `name`: TEXT; required.
+- `active`: BOOLEAN; required.
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+
+Constraints: [{"name": "fk_service_zones_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_service_zones", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_service_zones_city_id", "type": "UniqueConstraint", "sql": null, "columns": ["city_id", "name"]}].
+Indexes: [{"name": "ix_service_zones_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
 
 ## integration.integration_credentials_references
 
@@ -1660,6 +1487,23 @@ Indexes: [{"name": "ix_ai_agent_tool_calls_session_id", "columns": ["session_id"
 
 Constraints: [{"name": "fk_ai_feedback_run_id_ai_inference_runs", "type": "ForeignKeyConstraint", "sql": null, "columns": ["run_id"]}, {"name": "fk_ai_feedback_user_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["user_id"]}, {"name": "pk_ai_feedback", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_ai_feedback_run_id", "columns": ["run_id"], "unique": false, "predicate": "None"}, {"name": "ix_ai_feedback_user_id", "columns": ["user_id"], "unique": false, "predicate": "None"}].
+
+## intelligence.ai_optimization_decisions
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `mode`: TEXT; required.
+- `policy_version`: TEXT; required.
+- `objective_score`: NUMERIC(20, 4); required.
+- `plan`: JSONB; required.
+- `constraint_checks`: JSONB; required.
+- `runtime_ms`: INTEGER; required.
+- `fallback_reason`: TEXT; nullable.
+
+Constraints: [{"name": "ck_ai_optimization_decisions_rule_0", "type": "CheckConstraint", "sql": "runtime_ms >= 0", "columns": []}, {"name": "fk_ai_optimization_decisions_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_ai_optimization_decisions", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_ai_optimization_decisions_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
 
 ## intelligence.ai_prediction_records
 
@@ -1756,6 +1600,19 @@ Indexes: [{"name": "ix_merchant_contracts_legal_entity_id", "columns": ["legal_e
 
 Constraints: [{"name": "fk_merchant_tax_registrations_country_id_countries", "type": "ForeignKeyConstraint", "sql": null, "columns": ["country_id"]}, {"name": "fk_merchant_tax_registrations_legal_entity_id_merchant_legal_entities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["legal_entity_id"]}, {"name": "pk_merchant_tax_registrations", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_merchant_tax_registrations_country_id", "columns": ["country_id"], "unique": false, "predicate": "None"}, {"name": "ix_merchant_tax_registrations_legal_entity_id", "columns": ["legal_entity_id"], "unique": false, "predicate": "None"}].
+
+## operations.operational_incidents
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `severity`: TEXT; required.
+- `summary`: TEXT; required.
+- `status`: TEXT; required.
+
+Constraints: [{"name": "fk_operational_incidents_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "pk_operational_incidents", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_operational_incidents_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}].
 
 ## catalog.merchant_catalogs
 
@@ -2096,6 +1953,17 @@ Indexes: [{"name": "ix_payout_attempts_request_id", "columns": ["request_id"], "
 Constraints: [{"name": "fk_payout_bank_references_request_id_payout_requests", "type": "ForeignKeyConstraint", "sql": null, "columns": ["request_id"]}, {"name": "pk_payout_bank_references", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_payout_bank_references_request_id", "columns": ["request_id"], "unique": false, "predicate": "None"}].
 
+## fulfillment.delivery_routes
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `status`: TEXT; required.
+
+Constraints: [{"name": "fk_delivery_routes_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_delivery_routes", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_delivery_routes_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
+
 ## fulfillment.delivery_windows
 
 - `branch_id`: UUID; required; FK → merchant.merchant_branches.id (RESTRICT).
@@ -2110,31 +1978,152 @@ Indexes: [{"name": "ix_payout_bank_references_request_id", "columns": ["request_
 Constraints: [{"name": "ck_delivery_windows_window_capacity", "type": "CheckConstraint", "sql": "ends_at > starts_at AND capacity >= 0 AND reserved BETWEEN 0 AND capacity", "columns": []}, {"name": "fk_delivery_windows_branch_id_merchant_branches", "type": "ForeignKeyConstraint", "sql": null, "columns": ["branch_id"]}, {"name": "pk_delivery_windows", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_delivery_windows_branch_id", "columns": ["branch_id"], "unique": false, "predicate": "None"}].
 
-## fulfillment.pilot_vehicle_assignments
+## fulfillment.pilot_availability
 
 - `id`: UUID; required; PK.
 - `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 - `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 - `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
-- `vehicle_id`: UUID; required; FK → fulfillment.pilot_vehicles.id (RESTRICT).
-- `starts_at`: TIMESTAMP WITH TIME ZONE; required.
-- `ends_at`: TIMESTAMP WITH TIME ZONE; nullable.
+- `available`: BOOLEAN; required.
+- `changed_at`: TIMESTAMP WITH TIME ZONE; required.
 
-Constraints: [{"name": "fk_pilot_vehicle_assignments_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "fk_pilot_vehicle_assignments_vehicle_id_pilot_vehicles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["vehicle_id"]}, {"name": "pk_pilot_vehicle_assignments", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_pilot_vehicle_assignments_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_vehicle_assignments_vehicle_id", "columns": ["vehicle_id"], "unique": false, "predicate": "None"}].
+Constraints: [{"name": "fk_pilot_availability_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_availability", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_availability_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
 
-## fulfillment.route_optimization_runs
+## fulfillment.pilot_capabilities
 
 - `id`: UUID; required; PK.
 - `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
 - `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `route_id`: UUID; required; FK → fulfillment.delivery_routes.id (RESTRICT).
-- `strategy`: TEXT; required.
-- `input_hash`: TEXT; required.
-- `result`: JSONB; required.
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `capability`: TEXT; required.
+- `expires_at`: TIMESTAMP WITH TIME ZONE; nullable.
 
-Constraints: [{"name": "fk_route_optimization_runs_route_id_delivery_routes", "type": "ForeignKeyConstraint", "sql": null, "columns": ["route_id"]}, {"name": "pk_route_optimization_runs", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
-Indexes: [{"name": "ix_route_optimization_runs_route_id", "columns": ["route_id"], "unique": false, "predicate": "None"}].
+Constraints: [{"name": "fk_pilot_capabilities_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_capabilities", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_capabilities_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
+
+## fulfillment.pilot_documents
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `document_type`: TEXT; required.
+- `private_object_key`: TEXT; required.
+- `expires_at`: TIMESTAMP WITH TIME ZONE; nullable.
+
+Constraints: [{"name": "fk_pilot_documents_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_documents", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_documents_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
+
+## fulfillment.pilot_incentives
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `currency_id`: UUID; required; FK → finance.currencies.id (RESTRICT).
+- `amount`: NUMERIC(20, 4); required.
+- `policy_reference`: TEXT; required.
+
+Constraints: [{"name": "fk_pilot_incentives_currency_id_currencies", "type": "ForeignKeyConstraint", "sql": null, "columns": ["currency_id"]}, {"name": "fk_pilot_incentives_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_incentives", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_incentives_currency_id", "columns": ["currency_id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_incentives_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
+
+## fulfillment.pilot_latest_location
+
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `latitude`: NUMERIC(10, 7); required.
+- `longitude`: NUMERIC(10, 7); required.
+- `observed_at`: TIMESTAMP WITH TIME ZONE; required.
+- `accuracy_m`: NUMERIC(8, 2); required.
+- `heading_degrees`: NUMERIC(6, 2); nullable.
+- `speed_mps`: NUMERIC(7, 2); nullable.
+- `client_sequence`: INTEGER; required.
+- `battery_percent`: INTEGER; nullable.
+- `app_state`: TEXT; required.
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+
+Constraints: [{"name": "ck_pilot_latest_location_location_accuracy", "type": "CheckConstraint", "sql": "accuracy_m BETWEEN 0 AND 1000", "columns": []}, {"name": "ck_pilot_latest_location_location_app_state", "type": "CheckConstraint", "sql": "app_state IN ('foreground','background')", "columns": []}, {"name": "ck_pilot_latest_location_location_battery", "type": "CheckConstraint", "sql": "battery_percent IS NULL OR battery_percent BETWEEN 0 AND 100", "columns": []}, {"name": "ck_pilot_latest_location_location_coordinates", "type": "CheckConstraint", "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180", "columns": []}, {"name": "ck_pilot_latest_location_location_heading", "type": "CheckConstraint", "sql": "heading_degrees IS NULL OR heading_degrees BETWEEN 0 AND 360", "columns": []}, {"name": "ck_pilot_latest_location_location_speed", "type": "CheckConstraint", "sql": "speed_mps IS NULL OR speed_mps BETWEEN 0 AND 100", "columns": []}, {"name": "fk_pilot_latest_location_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_latest_location", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_pilot_latest_location_pilot_id", "type": "UniqueConstraint", "sql": null, "columns": ["pilot_id"]}].
+Indexes: [].
+
+## fulfillment.pilot_location_consents
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `policy_version`: TEXT; required.
+- `accepted`: BOOLEAN; required.
+
+Constraints: [{"name": "fk_pilot_location_consents_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_location_consents", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_location_consents_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
+
+## fulfillment.pilot_location_events
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `latitude`: NUMERIC(10, 7); required.
+- `longitude`: NUMERIC(10, 7); required.
+- `observed_at`: TIMESTAMP WITH TIME ZONE; required.
+- `accuracy_m`: NUMERIC(20, 4); required.
+- `heading_degrees`: NUMERIC(20, 4); nullable.
+- `speed_mps`: NUMERIC(20, 4); nullable.
+- `client_sequence`: INTEGER; required.
+- `battery_percent`: INTEGER; nullable.
+- `app_state`: TEXT; required.
+- `expires_at`: TIMESTAMP WITH TIME ZONE; required.
+
+Constraints: [{"name": "ck_pilot_location_events_rule_0", "type": "CheckConstraint", "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180", "columns": []}, {"name": "fk_pilot_location_events_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_location_events", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_history_retention", "columns": ["expires_at", "id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_history_subject_time", "columns": ["pilot_id", "observed_at", "id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_location_events_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
+
+## fulfillment.pilot_service_zones
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
+
+Constraints: [{"name": "fk_pilot_service_zones_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "fk_pilot_service_zones_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_pilot_service_zones", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_service_zones_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_service_zones_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
+
+## fulfillment.pilot_shifts
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `starts_at`: TIMESTAMP WITH TIME ZONE; required.
+- `ends_at`: TIMESTAMP WITH TIME ZONE; required.
+
+Constraints: [{"name": "fk_pilot_shifts_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_shifts", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_shifts_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
+
+## fulfillment.pilot_status_history
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `previous`: TEXT; required.
+- `current`: TEXT; required.
+- `actor_id`: UUID; required; FK → identity.users.id (RESTRICT).
+
+Constraints: [{"name": "fk_pilot_status_history_actor_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["actor_id"]}, {"name": "fk_pilot_status_history_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_status_history", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_status_history_actor_id", "columns": ["actor_id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_status_history_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
+
+## fulfillment.pilot_vehicles
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `vehicle_type`: TEXT; required.
+- `registration_token`: TEXT; required.
+
+Constraints: [{"name": "fk_pilot_vehicles_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "pk_pilot_vehicles", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_vehicles_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}].
 
 ## fulfillment.scheduled_order_occurrences
 
@@ -2149,6 +2138,107 @@ Indexes: [{"name": "ix_route_optimization_runs_route_id", "columns": ["route_id"
 
 Constraints: [{"name": "fk_scheduled_order_occurrences_order_id_orders", "type": "ForeignKeyConstraint", "sql": null, "columns": ["order_id"]}, {"name": "fk_scheduled_order_occurrences_plan_id_recurring_order_plans", "type": "ForeignKeyConstraint", "sql": null, "columns": ["plan_id"]}, {"name": "pk_scheduled_order_occurrences", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_scheduled_order_occurrences_plan_id", "type": "UniqueConstraint", "sql": null, "columns": ["plan_id", "scheduled_at"]}].
 Indexes: [{"name": "ix_scheduled_order_occurrences_order_id", "columns": ["order_id"], "unique": false, "predicate": "None"}, {"name": "ix_scheduled_order_occurrences_plan_id", "columns": ["plan_id"], "unique": false, "predicate": "None"}].
+
+## geo.delivery_service_areas
+
+- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
+- `name`: TEXT; required.
+- `spatial_ready`: BOOLEAN; required; default false.
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+
+Constraints: [{"name": "fk_delivery_service_areas_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_delivery_service_areas", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_delivery_service_areas_id", "type": "UniqueConstraint", "sql": null, "columns": ["id", "zone_id"]}].
+Indexes: [{"name": "ix_delivery_service_areas_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
+
+## geo.geo_locations
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `address_id`: UUID; required; FK → geo.addresses.id (RESTRICT).
+- `latitude`: NUMERIC(10, 7); required.
+- `longitude`: NUMERIC(10, 7); required.
+- `source`: TEXT; required.
+
+Constraints: [{"name": "ck_geo_locations_rule_0", "type": "CheckConstraint", "sql": "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180", "columns": []}, {"name": "fk_geo_locations_address_id_addresses", "type": "ForeignKeyConstraint", "sql": null, "columns": ["address_id"]}, {"name": "pk_geo_locations", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_geo_locations_address_id", "columns": ["address_id"], "unique": false, "predicate": "None"}].
+
+## geo.holidays
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `calendar_id`: UUID; required; FK → geo.operating_calendars.id (RESTRICT).
+- `local_date`: DATE; required.
+- `closed`: BOOLEAN; required.
+- `name`: TEXT; required.
+
+Constraints: [{"name": "fk_holidays_calendar_id_operating_calendars", "type": "ForeignKeyConstraint", "sql": null, "columns": ["calendar_id"]}, {"name": "pk_holidays", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_holidays_calendar_id", "type": "UniqueConstraint", "sql": null, "columns": ["calendar_id", "local_date"]}].
+Indexes: [{"name": "ix_holidays_calendar_id", "columns": ["calendar_id"], "unique": false, "predicate": "None"}].
+
+## geo.zone_boundaries
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
+- `revision`: INTEGER; required.
+- `effective_at`: TIMESTAMP WITH TIME ZONE; required.
+- `object_key`: TEXT; required.
+
+Constraints: [{"name": "fk_zone_boundaries_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_boundaries", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_zone_boundaries_zone_id", "type": "UniqueConstraint", "sql": null, "columns": ["zone_id", "revision"]}].
+Indexes: [{"name": "ix_zone_boundaries_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
+
+## geo.zone_capacity_settings
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
+- `maximum_active_tasks`: INTEGER; required.
+- `version`: INTEGER; required.
+
+Constraints: [{"name": "ck_zone_capacity_settings_rule_0", "type": "CheckConstraint", "sql": "maximum_active_tasks > 0", "columns": []}, {"name": "fk_zone_capacity_settings_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_capacity_settings", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_zone_capacity_settings_zone_id", "type": "UniqueConstraint", "sql": null, "columns": ["zone_id"]}].
+Indexes: [{"name": "ix_zone_capacity_settings_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
+
+## geo.zone_delivery_policies
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
+- `delivery_method`: TEXT; required.
+- `maximum_distance_m`: INTEGER; required.
+- `active`: BOOLEAN; required.
+
+Constraints: [{"name": "ck_zone_delivery_policies_rule_0", "type": "CheckConstraint", "sql": "maximum_distance_m > 0", "columns": []}, {"name": "fk_zone_delivery_policies_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_delivery_policies", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_zone_delivery_policies_zone_id", "type": "UniqueConstraint", "sql": null, "columns": ["zone_id", "delivery_method"]}].
+Indexes: [{"name": "ix_zone_delivery_policies_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
+
+## geo.zone_operating_hours
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
+- `weekday`: INTEGER; required.
+- `opens_at`: TIME WITHOUT TIME ZONE; required.
+- `closes_at`: TIME WITHOUT TIME ZONE; required.
+
+Constraints: [{"name": "ck_zone_operating_hours_rule_0", "type": "CheckConstraint", "sql": "weekday BETWEEN 0 AND 6", "columns": []}, {"name": "ck_zone_operating_hours_rule_1", "type": "CheckConstraint", "sql": "opens_at < closes_at", "columns": []}, {"name": "fk_zone_operating_hours_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_operating_hours", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_zone_operating_hours_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
+
+## geo.zone_service_categories
+
+- `zone_id`: UUID; required; FK → geo.service_zones.id (RESTRICT).
+- `category_id`: UUID; required; FK → catalog.product_categories.id (RESTRICT).
+- `enabled`: BOOLEAN; required.
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+
+Constraints: [{"name": "fk_zone_service_categories_category_id_product_categories", "type": "ForeignKeyConstraint", "sql": null, "columns": ["category_id"]}, {"name": "fk_zone_service_categories_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_zone_service_categories", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_zone_service_categories_zone_id", "type": "UniqueConstraint", "sql": null, "columns": ["zone_id", "category_id"]}].
+Indexes: [{"name": "ix_zone_service_categories_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
 
 ## identity.user_role_assignments
 
@@ -2187,6 +2277,23 @@ Indexes: [{"name": "ix_webhook_delivery_attempts_outbox_event_id", "columns": ["
 
 Constraints: [{"name": "fk_ai_agent_action_approvals_approver_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["approver_id"]}, {"name": "fk_ai_agent_action_approvals_tool_call_id_ai_agent_tool_calls", "type": "ForeignKeyConstraint", "sql": null, "columns": ["tool_call_id"]}, {"name": "pk_ai_agent_action_approvals", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_ai_agent_action_approvals_approver_id", "columns": ["approver_id"], "unique": false, "predicate": "None"}, {"name": "ix_ai_agent_action_approvals_tool_call_id", "columns": ["tool_call_id"], "unique": false, "predicate": "None"}].
+
+## intelligence.ai_forecast_outputs
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `city_id`: UUID; required; FK → geo.cities.id (RESTRICT).
+- `zone_id`: UUID; nullable; FK → geo.service_zones.id (RESTRICT).
+- `interval_minutes`: INTEGER; required.
+- `forecast`: JSONB; required.
+- `provenance`: TEXT; required.
+- `feature_schema_version`: TEXT; required.
+- `source_cutoff`: TIMESTAMP WITH TIME ZONE; required.
+- `expires_at`: TIMESTAMP WITH TIME ZONE; required.
+
+Constraints: [{"name": "ck_ai_forecast_outputs_rule_0", "type": "CheckConstraint", "sql": "interval_minutes > 0", "columns": []}, {"name": "fk_ai_forecast_outputs_city_id_cities", "type": "ForeignKeyConstraint", "sql": null, "columns": ["city_id"]}, {"name": "fk_ai_forecast_outputs_zone_id_service_zones", "type": "ForeignKeyConstraint", "sql": null, "columns": ["zone_id"]}, {"name": "pk_ai_forecast_outputs", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_ai_forecast_outputs_city_id", "columns": ["city_id"], "unique": false, "predicate": "None"}, {"name": "ix_ai_forecast_outputs_zone_id", "columns": ["zone_id"], "unique": false, "predicate": "None"}].
 
 ## inventory.inventory_locations
 
@@ -2274,19 +2381,6 @@ Indexes: [{"name": "ix_merchant_onboarding_reviews_branch_id", "columns": ["bran
 
 Constraints: [{"name": "ck_merchant_operating_hours_valid_hours", "type": "CheckConstraint", "sql": "weekday BETWEEN 0 AND 6 AND opens_at < closes_at", "columns": []}, {"name": "fk_merchant_operating_hours_branch_id_merchant_branches", "type": "ForeignKeyConstraint", "sql": null, "columns": ["branch_id"]}, {"name": "pk_merchant_operating_hours", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_merchant_operating_hours_branch_id", "type": "UniqueConstraint", "sql": null, "columns": ["branch_id", "weekday", "opens_at"]}].
 Indexes: [{"name": "ix_merchant_operating_hours_branch_id", "columns": ["branch_id"], "unique": false, "predicate": "None"}].
-
-## merchant.merchant_service_areas
-
-- `branch_id`: UUID; required; FK → merchant.merchant_branches.id (RESTRICT).
-- `area_id`: UUID; required; FK → geo.delivery_service_areas.id (RESTRICT).
-- `category_id`: UUID; required; FK → catalog.product_categories.id (RESTRICT).
-- `delivery_method`: TEXT; required.
-- `id`: UUID; required; PK.
-- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
-
-Constraints: [{"name": "fk_merchant_service_areas_area_id_delivery_service_areas", "type": "ForeignKeyConstraint", "sql": null, "columns": ["area_id"]}, {"name": "fk_merchant_service_areas_branch_id_merchant_branches", "type": "ForeignKeyConstraint", "sql": null, "columns": ["branch_id"]}, {"name": "fk_merchant_service_areas_category_id_product_categories", "type": "ForeignKeyConstraint", "sql": null, "columns": ["category_id"]}, {"name": "pk_merchant_service_areas", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_merchant_service_areas_branch_id", "type": "UniqueConstraint", "sql": null, "columns": ["branch_id", "area_id", "category_id", "delivery_method"]}].
-Indexes: [{"name": "ix_merchant_service_areas_branch_id", "columns": ["branch_id"], "unique": false, "predicate": "None"}].
 
 ## merchant.merchant_special_hours
 
@@ -2438,7 +2532,7 @@ Indexes: [{"name": "ix_invoice_lines_invoice_id", "columns": ["invoice_id"], "un
 ## finance.journal_lines
 
 - `journal_id`: UUID; required; FK → finance.journal_entries.id (RESTRICT).
-- `organization_id`: UUID; required; FK → finance.journal_entries.organization_id (RESTRICT); FK → finance.ledger_accounts.organization_id (RESTRICT).
+- `organization_id`: UUID; required; FK → finance.ledger_accounts.organization_id (RESTRICT); FK → finance.journal_entries.organization_id (RESTRICT).
 - `account_id`: UUID; required; FK → finance.ledger_accounts.id (RESTRICT).
 - `currency`: VARCHAR(3); required; FK → finance.ledger_accounts.currency (RESTRICT).
 - `amount`: NUMERIC(20, 4); required.
@@ -2580,6 +2674,32 @@ Indexes: [{"name": "ix_delivery_slot_capacity_category_id", "columns": ["categor
 Constraints: [{"name": "fk_fulfillment_units_merchant_order_id_merchant_orders", "type": "ForeignKeyConstraint", "sql": null, "columns": ["merchant_order_id"]}, {"name": "fk_fulfillment_units_window_id_delivery_windows", "type": "ForeignKeyConstraint", "sql": null, "columns": ["window_id"]}, {"name": "pk_fulfillment_units", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_fulfillment_units_merchant_order_id", "columns": ["merchant_order_id"], "unique": false, "predicate": "None"}].
 
+## fulfillment.pilot_vehicle_assignments
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `pilot_id`: UUID; required; FK → fulfillment.pilot_profiles.id (RESTRICT).
+- `vehicle_id`: UUID; required; FK → fulfillment.pilot_vehicles.id (RESTRICT).
+- `starts_at`: TIMESTAMP WITH TIME ZONE; required.
+- `ends_at`: TIMESTAMP WITH TIME ZONE; nullable.
+
+Constraints: [{"name": "fk_pilot_vehicle_assignments_pilot_id_pilot_profiles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["pilot_id"]}, {"name": "fk_pilot_vehicle_assignments_vehicle_id_pilot_vehicles", "type": "ForeignKeyConstraint", "sql": null, "columns": ["vehicle_id"]}, {"name": "pk_pilot_vehicle_assignments", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_pilot_vehicle_assignments_pilot_id", "columns": ["pilot_id"], "unique": false, "predicate": "None"}, {"name": "ix_pilot_vehicle_assignments_vehicle_id", "columns": ["vehicle_id"], "unique": false, "predicate": "None"}].
+
+## fulfillment.route_optimization_runs
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `route_id`: UUID; required; FK → fulfillment.delivery_routes.id (RESTRICT).
+- `strategy`: TEXT; required.
+- `input_hash`: TEXT; required.
+- `result`: JSONB; required.
+
+Constraints: [{"name": "fk_route_optimization_runs_route_id_delivery_routes", "type": "ForeignKeyConstraint", "sql": null, "columns": ["route_id"]}, {"name": "pk_route_optimization_runs", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_route_optimization_runs_route_id", "columns": ["route_id"], "unique": false, "predicate": "None"}].
+
 ## fulfillment.scheduled_orders
 
 - `id`: UUID; required; PK.
@@ -2656,6 +2776,19 @@ Indexes: [{"name": "ix_stock_batches_stock_id", "columns": ["stock_id"], "unique
 
 Constraints: [{"name": "fk_stock_count_sessions_location_id_inventory_locations", "type": "ForeignKeyConstraint", "sql": null, "columns": ["location_id"]}, {"name": "fk_stock_count_sessions_started_by_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["started_by"]}, {"name": "pk_stock_count_sessions", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_stock_count_sessions_location_id", "columns": ["location_id"], "unique": false, "predicate": "None"}, {"name": "ix_stock_count_sessions_started_by", "columns": ["started_by"], "unique": false, "predicate": "None"}].
+
+## merchant.merchant_service_areas
+
+- `branch_id`: UUID; required; FK → merchant.merchant_branches.id (RESTRICT).
+- `area_id`: UUID; required; FK → geo.delivery_service_areas.id (RESTRICT).
+- `category_id`: UUID; required; FK → catalog.product_categories.id (RESTRICT).
+- `delivery_method`: TEXT; required.
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+
+Constraints: [{"name": "fk_merchant_service_areas_area_id_delivery_service_areas", "type": "ForeignKeyConstraint", "sql": null, "columns": ["area_id"]}, {"name": "fk_merchant_service_areas_branch_id_merchant_branches", "type": "ForeignKeyConstraint", "sql": null, "columns": ["branch_id"]}, {"name": "fk_merchant_service_areas_category_id_product_categories", "type": "ForeignKeyConstraint", "sql": null, "columns": ["category_id"]}, {"name": "pk_merchant_service_areas", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}, {"name": "uq_merchant_service_areas_branch_id", "type": "UniqueConstraint", "sql": null, "columns": ["branch_id", "area_id", "category_id", "delivery_method"]}].
+Indexes: [{"name": "ix_merchant_service_areas_branch_id", "columns": ["branch_id"], "unique": false, "predicate": "None"}].
 
 ## merchant.merchant_staff_roles
 
@@ -2957,6 +3090,23 @@ Indexes: [{"name": "ix_delivery_task_items_order_item_id", "columns": ["order_it
 Constraints: [{"name": "fk_dispatch_events_actor_id_users", "type": "ForeignKeyConstraint", "sql": null, "columns": ["actor_id"]}, {"name": "fk_dispatch_events_task_id_delivery_tasks", "type": "ForeignKeyConstraint", "sql": null, "columns": ["task_id"]}, {"name": "pk_dispatch_events", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
 Indexes: [{"name": "ix_dispatch_events_actor_id", "columns": ["actor_id"], "unique": false, "predicate": "None"}, {"name": "ix_dispatch_events_task_id", "columns": ["task_id"], "unique": false, "predicate": "None"}].
 
+## fulfillment.eta_estimates
+
+- `id`: UUID; required; PK.
+- `created_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `updated_at`: TIMESTAMP WITH TIME ZONE; required; default now().
+- `task_id`: UUID; required; FK → fulfillment.delivery_tasks.id (RESTRICT).
+- `generated_at`: TIMESTAMP WITH TIME ZONE; required.
+- `pickup_at`: TIMESTAMP WITH TIME ZONE; nullable.
+- `delivery_at`: TIMESTAMP WITH TIME ZONE; required.
+- `source`: TEXT; required.
+- `confidence`: TEXT; required.
+- `rule_version`: TEXT; required.
+- `reason`: TEXT; required.
+
+Constraints: [{"name": "fk_eta_estimates_task_id_delivery_tasks", "type": "ForeignKeyConstraint", "sql": null, "columns": ["task_id"]}, {"name": "pk_eta_estimates", "type": "PrimaryKeyConstraint", "sql": null, "columns": ["id"]}].
+Indexes: [{"name": "ix_eta_estimates_task_id", "columns": ["task_id"], "unique": false, "predicate": "None"}].
+
 ## fulfillment.pickup_confirmations
 
 - `id`: UUID; required; PK.
@@ -3145,5 +3295,5 @@ Indexes: [{"name": "ix_stock_adjustments_approved_by", "columns": ["approved_by"
 
 ## Database-only invariants
 
-The deferred `finance.require_balanced_journal` constraint trigger is included in the total database constraint count in addition to ordinary ORM constraints. Full guard definitions are frozen in Alembic revisions 0001 and 0003. There are 57 user triggers, including posted-journal/line immutability, currency balance, scope, refund approval and append-only records.
+The deferred `finance.require_balanced_journal` constraint trigger is included in the total database constraint count in addition to ordinary ORM constraints. Full guard definitions are frozen in the Alembic revision history. There are 59 user triggers, including posted-journal/line immutability, currency balance, scope, refund approval and append-only records.
 
