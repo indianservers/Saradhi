@@ -128,7 +128,8 @@ class RoleAssignment(Record, Base):
             postgresql_nulls_not_distinct=True,
         ),
         CheckConstraint(
-            "(city_id IS NULL AND branch_id IS NULL) OR organization_id IS NOT NULL",
+            "(city_id IS NULL AND branch_id IS NULL) OR organization_id IS NOT NULL "
+            "OR (city_id IS NOT NULL AND branch_id IS NULL)",
             name="scoped_assignment",
         ),
         {"schema": "identity"},
@@ -424,6 +425,60 @@ class MerchantOrder(Record, Base):
     currency: Mapped[str] = fk("finance.currencies.code")
     total: Mapped[Decimal] = mapped_column(Numeric(20, 4))
     version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class KitchenStation(Record, Base):
+    __tablename__ = "kitchen_stations"
+    __table_args__ = (
+        UniqueConstraint("branch_id", "name"),
+        CheckConstraint("max_concurrent BETWEEN 1 AND 100", name="station_capacity"),
+        {"schema": "merchant"},
+    )
+    branch_id: Mapped[UUID] = fk("merchant.merchant_branches.id", index=True)
+    name: Mapped[str] = mapped_column(Text)
+    is_packaging: Mapped[bool] = mapped_column(Boolean, default=False)
+    max_concurrent: Mapped[int] = mapped_column(Integer, default=5)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class KitchenTask(Record, Base):
+    __tablename__ = "kitchen_tasks"
+    __table_args__ = (
+        UniqueConstraint("merchant_order_id", "task_key"),
+        CheckConstraint("task_type IN ('prep', 'packing')", name="task_type"),
+        CheckConstraint(
+            "status IN ('pending', 'in_progress', 'paused', 'completed')", name="task_status"
+        ),
+        CheckConstraint("quantity > 0", name="task_quantity"),
+        {"schema": "commerce"},
+    )
+    merchant_order_id: Mapped[UUID] = fk("commerce.merchant_orders.id", index=True)
+    order_item_id: Mapped[UUID | None] = fk("commerce.order_items.id", index=True)
+    branch_id: Mapped[UUID] = fk("merchant.merchant_branches.id", index=True)
+    station_id: Mapped[UUID] = fk("merchant.kitchen_stations.id", index=True)
+    task_key: Mapped[str] = mapped_column(Text)
+    task_type: Mapped[str] = mapped_column(Text)
+    label: Mapped[str] = mapped_column(Text)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(20, 4), default=1)
+    status: Mapped[str] = mapped_column(Text, default="pending")
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    target_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    estimate_provenance: Mapped[str] = mapped_column(Text, default="deterministic_rule")
+    estimate_model_version: Mapped[str] = mapped_column(Text, default="preparation-v1")
+
+
+class KitchenTaskDependency(Record, Base):
+    __tablename__ = "kitchen_task_dependencies"
+    __table_args__ = (
+        UniqueConstraint("task_id", "depends_on_task_id"),
+        CheckConstraint("task_id <> depends_on_task_id", name="no_self_dependency"),
+        {"schema": "commerce"},
+    )
+    task_id: Mapped[UUID] = fk("commerce.kitchen_tasks.id", index=True)
+    depends_on_task_id: Mapped[UUID] = fk("commerce.kitchen_tasks.id", index=True)
 
 
 class OrderItem(Record, Base):
@@ -771,6 +826,7 @@ class Ticket(Record, Base):
     organization_id: Mapped[UUID | None] = fk("identity.organizations.id")
     subject: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, default="open")
+    assigned_to_id: Mapped[UUID | None] = fk("identity.users.id", index=True)
 
 
 class TicketMessage(Record, Base):

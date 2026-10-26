@@ -8,7 +8,11 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
-export { AdminControlTower } from "./admin-control-tower";
+export {
+  AdminControlTower,
+  CityOperationsWorkspace,
+  SupportConsoleWorkspace,
+} from "./admin-control-tower";
 
 export function Shell({
   title,
@@ -107,26 +111,4 @@ export function Shell({
   );
 }
 
-export function Login({ name }: { name: string }) {
-  return (
-    <main className="login">
-      <div className="login-panel">
-        <span className="brandmark">
-          <ShieldCheck />
-        </span>
-        <p className="eyebrow">QUICKBUDDY / {name}</p>
-        <h1>Secure workspace access</h1>
-        <p>
-          Identity provider setup is required before sign-in is available. Your
-          administrator must configure OIDC and provision your workspace role.
-        </p>
-        <div className="foundation">
-          Authentication is closed until configured.
-        </div>
-        <a className="backlink" href="/">
-          Explore the platform shell <ArrowUpRight size={16} />
-        </a>
-      </div>
-    </main>
-  );
-}
+export { Login } from "./login";

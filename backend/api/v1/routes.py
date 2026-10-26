@@ -19,7 +19,7 @@ from ai_platform.optimization.dispatch.greedy import greedy_one_to_one
 from backend.api.v1 import schemas as s
 from backend.api.v1.dependencies import DB, Actor
 from backend.application import commerce, finance, identity, logistics
-from backend.application.common import add, audit, branch_scope, now, owned, scoped
+from backend.application.common import add, audit, branch_scope, event, now, owned, scoped
 from backend.domain.rules import BusinessError, money
 from backend.modules.fulfillment import eta as eta_engine
 from backend.modules.tracking import service as tracking
@@ -326,6 +326,56 @@ async def cities(db: DB, cursor: str | None = None, limit: Limit = 50):
     return await page(db, m.City, [m.City.active.is_(True)], s.CityOut, cursor, limit)
 
 
+@router.get(
+    "/operations/authorized-cities",
+    response_model=s.Page[s.CityOut],
+    tags=["Dispatch operations"],
+)
+async def authorized_cities(actor: Actor, db: DB, cursor: str | None = None, limit: Limit = 100):
+    user = await db.get(m.User, UUID(actor.subject))
+    if not user or user.status != "active":
+        raise BusinessError("forbidden", "Access denied", 403)
+    assignments = (
+        await db.execute(
+            select(m.RoleAssignment, m.Role.name)
+            .join(m.Role, m.Role.id == m.RoleAssignment.role_id)
+            .join(m.RolePermission, m.RolePermission.role_id == m.Role.id)
+            .join(m.Permission, m.Permission.id == m.RolePermission.permission_id)
+            .where(
+                m.RoleAssignment.user_id == UUID(actor.subject),
+                m.Permission.code == "dispatch.write",
+            )
+        )
+    ).all()
+    global_scope = any(
+        role == "platform_super_admin" and assignment.organization_id is None
+        for assignment, role in assignments
+    )
+    if global_scope:
+        return await page(db, m.City, [m.City.active.is_(True)], s.CityOut, cursor, limit)
+
+    candidates = {
+        assignment.city_id
+        for assignment, _role in assignments
+        if assignment.city_id is not None and assignment.branch_id is None
+    }
+    permitted = set()
+    for city_id in candidates:
+        try:
+            await scoped(db, actor, "dispatch.write", city_id=city_id)
+            permitted.add(city_id)
+        except BusinessError:
+            continue
+    return await page(
+        db,
+        m.City,
+        [m.City.active.is_(True), m.City.id.in_(permitted)],
+        s.CityOut,
+        cursor,
+        limit,
+    )
+
+
 @router.post("/geo/zones", response_model=s.NamedOut, status_code=201, tags=["Geography"])
 async def zone(body: s.ZoneIn, actor: Actor, db: DB):
     await scoped(db, actor, "geo.write")
@@ -367,14 +417,18 @@ async def branches(
     rows, next_id = await Repository(db).page(
         m.Branch, predicates, after=decode_cursor(cursor), limit=limit
     )
-    brand_types = {
-        row.id: row.merchant_type
-        for row in (
-            await db.scalars(
-                select(m.Brand).where(m.Brand.id.in_({branch.brand_id for branch in rows}))
-            )
-        ).all()
-    } if rows else {}
+    brand_types = (
+        {
+            row.id: row.merchant_type
+            for row in (
+                await db.scalars(
+                    select(m.Brand).where(m.Brand.id.in_({branch.brand_id for branch in rows}))
+                )
+            ).all()
+        }
+        if rows
+        else {}
+    )
     return {
         "items": [
             s.BranchOut.model_validate(branch).model_copy(
@@ -389,9 +443,7 @@ async def branches(
 
 
 @router.get("/merchant/branches", response_model=s.Page[s.BranchOut], tags=["Merchant workspace"])
-async def merchant_branches(
-    actor: Actor, db: DB, cursor: str | None = None, limit: Limit = 50
-):
+async def merchant_branches(actor: Actor, db: DB, cursor: str | None = None, limit: Limit = 50):
     """List only branches in active merchant memberships with current branch authority."""
     user_id = UUID(actor.subject)
     assignments = m.RoleAssignment
@@ -665,29 +717,29 @@ async def customer_catalog(
         )
     if cursor:
         statement = statement.where(m.Price.id > decode_cursor(cursor))
-    rows = (
-        await db.execute(statement.order_by(m.Price.id).limit(limit + 1))
-    ).all()
+    rows = (await db.execute(statement.order_by(m.Price.id).limit(limit + 1))).all()
     has_more = len(rows) > limit
     items = []
     for price, variant, product, branch, brand, category_row, stock in rows[:limit]:
-        items.append(s.CatalogProductOut(
-            id=price.id,
-            product_id=product.id,
-            variant_id=variant.id,
-            branch_id=branch.id,
-            branch_name=branch.name,
-            merchant_type=brand.merchant_type,
-            category_id=category_row.id,
-            category_name=category_row.name,
-            name=product.name,
-            variant_name=variant.name,
-            unit=product.unit,
-            variable_weight=product.variable_weight,
-            currency=price.currency,
-            unit_price=price.amount,
-            available_quantity=stock.on_hand - stock.reserved,
-        ))
+        items.append(
+            s.CatalogProductOut(
+                id=price.id,
+                product_id=product.id,
+                variant_id=variant.id,
+                branch_id=branch.id,
+                branch_name=branch.name,
+                merchant_type=brand.merchant_type,
+                category_id=category_row.id,
+                category_name=category_row.name,
+                name=product.name,
+                variant_name=variant.name,
+                unit=product.unit,
+                variable_weight=product.variable_weight,
+                currency=price.currency,
+                unit_price=price.amount,
+                available_quantity=stock.on_hand - stock.reserved,
+            )
+        )
     next_cursor = None
     if has_more and items:
         next_cursor = base64.urlsafe_b64encode(items[-1].id.bytes).decode().rstrip("=")
@@ -927,6 +979,39 @@ async def receive_batch(branch_id: UUID, body: s.BatchIn, actor: Actor, db: DB):
 
 
 @router.get(
+    "/inventory/branches/{branch_id}/batches",
+    response_model=list[s.StockBatchOut],
+    tags=["Inventory"],
+)
+async def stock_batches(branch_id: UUID, actor: Actor, db: DB, limit: Limit = 100):
+    await branch_scope(db, actor, branch_id, "inventory.read")
+    Batch, Expiry = F["inventory.stock_batches"], F["inventory.expiry_dates"]
+    rows = (
+        await db.execute(
+            select(Batch, m.Stock, Expiry.expires_on)
+            .join(m.Stock, Batch.stock_id == m.Stock.id)
+            .outerjoin(Expiry, Expiry.batch_id == Batch.id)
+            .where(m.Stock.branch_id == branch_id)
+            .order_by(Expiry.expires_on.asc().nulls_last(), Batch.received_at, Batch.id)
+            .limit(limit)
+        )
+    ).all()
+    return [
+        s.StockBatchOut(
+            id=batch.id,
+            branch_id=stock.branch_id,
+            variant_id=stock.variant_id,
+            lot_code=batch.lot_code,
+            quantity=batch.quantity,
+            reserved=batch.reserved,
+            expires_on=expires_on,
+            received_at=batch.received_at,
+        )
+        for batch, stock, expires_on in rows
+    ]
+
+
+@router.get(
     "/inventory/branches/{branch_id}", response_model=s.Page[s.StockOut], tags=["Inventory"]
 )
 async def stock_status(
@@ -987,10 +1072,17 @@ async def cart_items(
     items = []
     for row in rows:
         names = by_id.get(row.id, (None, None, None))
-        items.append(s.CartItemOut.model_validate(row).model_copy(update={
-            "product_name": names[0], "variant_name": names[1], "branch_name": names[2],
-            "window_starts_at": names[3], "window_ends_at": names[4],
-        }))
+        items.append(
+            s.CartItemOut.model_validate(row).model_copy(
+                update={
+                    "product_name": names[0],
+                    "variant_name": names[1],
+                    "branch_name": names[2],
+                    "window_starts_at": names[3],
+                    "window_ends_at": names[4],
+                }
+            )
+        )
     return {
         "items": items,
         "next_cursor": base64.urlsafe_b64encode(next_id.bytes).decode().rstrip("=")
@@ -1019,14 +1111,22 @@ async def quote(cart_id: UUID, actor: Actor, db: DB):
     lines = quote_row.snapshot.get("lines", [])
     branch_ids = {UUID(line["branch_id"]) for line in lines}
     window_ids = {UUID(line["window_id"]) for line in lines}
-    branches_by_id = {
-        row.id: row.name
-        for row in (await db.scalars(select(m.Branch).where(m.Branch.id.in_(branch_ids)))).all()
-    } if branch_ids else {}
-    windows_by_id = {
-        row.id: row
-        for row in (await db.scalars(select(m.Window).where(m.Window.id.in_(window_ids)))).all()
-    } if window_ids else {}
+    branches_by_id = (
+        {
+            row.id: row.name
+            for row in (await db.scalars(select(m.Branch).where(m.Branch.id.in_(branch_ids)))).all()
+        }
+        if branch_ids
+        else {}
+    )
+    windows_by_id = (
+        {
+            row.id: row
+            for row in (await db.scalars(select(m.Window).where(m.Window.id.in_(window_ids)))).all()
+        }
+        if window_ids
+        else {}
+    )
     for line in lines:
         branch_id, window_id = UUID(line["branch_id"]), UUID(line["window_id"])
         line["branch_name"] = branches_by_id.get(branch_id)
@@ -1145,12 +1245,16 @@ async def merchant_order_queue(
         limit=limit,
     )
     item_rows = (
-        await db.scalars(
-            select(m.OrderItem)
-            .where(m.OrderItem.merchant_order_id.in_({child.id for child in children}))
-            .order_by(m.OrderItem.created_at, m.OrderItem.id)
-        )
-    ).all() if children else []
+        (
+            await db.scalars(
+                select(m.OrderItem)
+                .where(m.OrderItem.merchant_order_id.in_({child.id for child in children}))
+                .order_by(m.OrderItem.created_at, m.OrderItem.id)
+            )
+        ).all()
+        if children
+        else []
+    )
     items_by_order: dict[UUID, list[s.MerchantQueueItem]] = {}
     for item in item_rows:
         items_by_order.setdefault(item.merchant_order_id, []).append(
@@ -1174,6 +1278,251 @@ async def merchant_order_queue(
         if next_id
         else None,
     }
+
+
+@router.post(
+    "/merchant/branches/{branch_id}/kitchen/stations",
+    response_model=s.KitchenStationOut,
+    status_code=201,
+    tags=["Merchant workspace"],
+)
+async def create_kitchen_station(
+    branch_id: UUID, body: s.KitchenStationIn, actor: Actor, request: Request, db: DB
+):
+    branch = await branch_scope(db, actor, branch_id, "merchant.write", True)
+    if await db.scalar(
+        select(m.KitchenStation.id).where(
+            m.KitchenStation.branch_id == branch.id,
+            func.lower(m.KitchenStation.name) == body.name.lower(),
+        )
+    ):
+        raise BusinessError("station_exists", "A station with this name already exists", 409)
+    station = await add(
+        db, m.KitchenStation, branch_id=branch.id, **body.model_dump(), active=True, version=1
+    )
+    await audit(
+        db,
+        actor,
+        "merchant.kitchen_station_created",
+        station.id,
+        request.state.request_id,
+        branch.organization_id,
+        version=1,
+    )
+    await db.refresh(station)
+    return station
+
+
+@router.get(
+    "/merchant/branches/{branch_id}/kitchen/stations",
+    response_model=list[s.KitchenStationOut],
+    tags=["Merchant workspace"],
+)
+async def kitchen_stations(branch_id: UUID, actor: Actor, db: DB):
+    await branch_scope(db, actor, branch_id, "merchant.write")
+    return (
+        await db.scalars(
+            select(m.KitchenStation)
+            .where(m.KitchenStation.branch_id == branch_id)
+            .order_by(m.KitchenStation.is_packaging, m.KitchenStation.name)
+        )
+    ).all()
+
+
+@router.get(
+    "/merchant/branches/{branch_id}/kitchen/tasks",
+    response_model=s.KitchenTaskPage,
+    tags=["Merchant workspace"],
+)
+async def kitchen_tasks(
+    branch_id: UUID,
+    actor: Actor,
+    db: DB,
+    station_id: UUID | None = None,
+    status: str | None = None,
+    cursor: str | None = None,
+    limit: Limit = 100,
+):
+    await branch_scope(db, actor, branch_id, "merchant.write")
+    predicates = [m.KitchenTask.branch_id == branch_id]
+    if station_id:
+        predicates.append(m.KitchenTask.station_id == station_id)
+    if status:
+        if status not in {"pending", "in_progress", "paused", "completed"}:
+            raise BusinessError("invalid_task_status", "Unknown kitchen task status", 422)
+        predicates.append(m.KitchenTask.status == status)
+    rows, next_id = await Repository(db).page(
+        m.KitchenTask, predicates, after=decode_cursor(cursor), limit=limit
+    )
+    station_ids = {row.station_id for row in rows}
+    stations = (
+        (
+            await db.scalars(select(m.KitchenStation).where(m.KitchenStation.id.in_(station_ids)))
+        ).all()
+        if station_ids
+        else []
+    )
+    station_names = {row.id: row.name for row in stations}
+    blockers = {}
+    if rows:
+        pairs = (
+            await db.execute(
+                select(m.KitchenTaskDependency.task_id, m.KitchenTaskDependency.depends_on_task_id)
+                .join(m.KitchenTask, m.KitchenTask.id == m.KitchenTaskDependency.depends_on_task_id)
+                .where(
+                    m.KitchenTaskDependency.task_id.in_([r.id for r in rows]),
+                    m.KitchenTask.status != "completed",
+                )
+            )
+        ).all()
+        for task_id, dependency_id in pairs:
+            blockers.setdefault(task_id, []).append(dependency_id)
+    return {
+        "items": [
+            s.KitchenTaskOut.model_validate(
+                {
+                    **{
+                        column.name: getattr(row, column.name)
+                        for column in m.KitchenTask.__table__.columns
+                    },
+                    "station_name": station_names[row.station_id],
+                    "blocked_by": blockers.get(row.id, []),
+                }
+            )
+            for row in rows
+        ],
+        "next_cursor": base64.urlsafe_b64encode(next_id.bytes).decode().rstrip("=")
+        if next_id
+        else None,
+    }
+
+
+@router.put(
+    "/merchant/kitchen/tasks/{task_id}/station",
+    response_model=s.KitchenTaskOut,
+    tags=["Merchant workspace"],
+)
+async def reassign_kitchen_task(
+    task_id: UUID, body: s.KitchenTaskStationIn, actor: Actor, request: Request, db: DB
+):
+    task = await Repository(db).require(m.KitchenTask, task_id, lock=True)
+    branch = await branch_scope(db, actor, task.branch_id, "merchant.write", True)
+    if task.version != body.expected_version:
+        raise BusinessError("version_conflict", "Expected version does not match")
+    if task.status != "pending":
+        raise BusinessError("task_already_started", "Only pending tasks can be reassigned", 409)
+    station = await Repository(db).require(m.KitchenStation, body.station_id)
+    if station.branch_id != branch.id or not station.active:
+        raise BusinessError("invalid_station", "Station is unavailable for this branch", 422)
+    if station.is_packaging != (task.task_type == "packing"):
+        raise BusinessError("station_type_mismatch", "Task requires a matching station type", 422)
+    task.station_id = station.id
+    task.version += 1
+    await audit(
+        db,
+        actor,
+        "merchant.kitchen_task_reassigned",
+        task.id,
+        request.state.request_id,
+        branch.organization_id,
+        version=task.version,
+    )
+    await db.refresh(task)
+    return await _kitchen_task_out(db, task)
+
+
+@router.post(
+    "/merchant/kitchen/tasks/{task_id}/transition",
+    response_model=s.KitchenTaskOut,
+    tags=["Merchant workspace"],
+)
+async def transition_kitchen_task(
+    task_id: UUID, body: s.KitchenTaskTransitionIn, actor: Actor, request: Request, db: DB
+):
+    task = await Repository(db).require(m.KitchenTask, task_id, lock=True)
+    branch = await branch_scope(db, actor, task.branch_id, "merchant.write")
+    if task.status == body.target:
+        return await _kitchen_task_out(db, task)
+    if task.version != body.expected_version:
+        raise BusinessError("version_conflict", "Expected version does not match")
+    child = await Repository(db).require(m.MerchantOrder, task.merchant_order_id, lock=True)
+    if child.status != "preparing":
+        raise BusinessError("order_not_preparing", "Kitchen work requires a preparing order", 409)
+    allowed = {
+        "pending": {"in_progress"},
+        "in_progress": {"paused", "completed"},
+        "paused": {"in_progress"},
+        "completed": set(),
+    }
+    if body.target not in allowed[task.status]:
+        raise BusinessError(
+            "invalid_task_transition", "Kitchen task transition is not allowed", 409
+        )
+    station = await Repository(db).require(m.KitchenStation, task.station_id, lock=True)
+    if not station.active:
+        raise BusinessError("station_unavailable", "Kitchen station is inactive", 409)
+    if body.target == "in_progress":
+        blockers = await db.scalar(
+            select(m.KitchenTaskDependency.id)
+            .join(m.KitchenTask, m.KitchenTask.id == m.KitchenTaskDependency.depends_on_task_id)
+            .where(m.KitchenTaskDependency.task_id == task.id, m.KitchenTask.status != "completed")
+            .limit(1)
+        )
+        if blockers:
+            raise BusinessError("task_blocked", "Complete prerequisite tasks first", 409)
+        active_count = await db.scalar(
+            select(func.count())
+            .select_from(m.KitchenTask)
+            .where(
+                m.KitchenTask.station_id == station.id,
+                m.KitchenTask.status == "in_progress",
+                m.KitchenTask.id != task.id,
+            )
+        )
+        if int(active_count or 0) >= station.max_concurrent:
+            raise BusinessError(
+                "station_at_capacity", "Station has reached concurrent task capacity", 409
+            )
+        task.started_at = task.started_at or now()
+    previous = task.status
+    task.status = body.target
+    task.version += 1
+    if body.target == "completed":
+        task.completed_at = now()
+    await audit(
+        db,
+        actor,
+        "merchant.kitchen_task_transitioned",
+        task.id,
+        request.state.request_id,
+        branch.organization_id,
+        version=task.version,
+        previous=previous,
+        current=body.target,
+    )
+    await db.refresh(task)
+    return await _kitchen_task_out(db, task)
+
+
+async def _kitchen_task_out(db, task):
+    station = await db.get(m.KitchenStation, task.station_id)
+    blockers = (
+        await db.scalars(
+            select(m.KitchenTaskDependency.depends_on_task_id)
+            .join(m.KitchenTask, m.KitchenTask.id == m.KitchenTaskDependency.depends_on_task_id)
+            .where(m.KitchenTaskDependency.task_id == task.id, m.KitchenTask.status != "completed")
+        )
+    ).all()
+    return s.KitchenTaskOut.model_validate(
+        {
+            **{
+                column.name: getattr(task, column.name)
+                for column in m.KitchenTask.__table__.columns
+            },
+            "station_name": station.name,
+            "blocked_by": list(blockers),
+        }
+    )
 
 
 @router.post("/merchant-orders/{child_id}/transition", response_model=s.ChildOut, tags=["Commerce"])
@@ -1204,7 +1553,25 @@ async def availability(pilot_id: UUID, body: s.AvailableIn, actor: Actor, db: DB
     owned(actor, pilot.user_id)
     if not pilot.verified:
         raise BusinessError("unverified_pilot", "Pilot verification is required", 403)
+    if pilot.state == "suspended":
+        raise BusinessError("pilot_unavailable", "Suspended pilots cannot change availability", 403)
     if body.available:
+        Incident = F["operations.operational_incidents"]
+        unresolved_safety_report = await db.scalar(
+            select(Incident.id)
+            .where(
+                Incident.pilot_id == pilot.id,
+                Incident.safety_emergency.is_(True),
+                Incident.status.in_(["open", "acknowledged"]),
+            )
+            .limit(1)
+        )
+        if unresolved_safety_report:
+            raise BusinessError(
+                "incident_review_pending",
+                "Operations must resolve the safety report before you can go online",
+                409,
+            )
         if not pilot.location_consent_at:
             raise BusinessError(
                 "location_consent_required",
@@ -1217,6 +1584,21 @@ async def availability(pilot_id: UUID, body: s.AvailableIn, actor: Actor, db: DB
         if not latest or latest.observed_at < now() - timedelta(seconds=90):
             raise BusinessError(
                 "fresh_location_required", "Submit current location before going online", 409
+            )
+    else:
+        active = await db.scalar(
+            select(m.Assignment.id)
+            .where(
+                m.Assignment.pilot_id == pilot.id,
+                m.Assignment.status.in_(["offered", "accepted", "picked_up"]),
+            )
+            .limit(1)
+        )
+        if active:
+            raise BusinessError(
+                "active_assignment",
+                "Reject open offers or complete/reassign active deliveries before going offline",
+                409,
             )
     pilot.available = body.available
     pilot.state = "online_available" if body.available else "offline"
@@ -1235,6 +1617,22 @@ async def my_availability(body: s.PilotAvailabilityIn, actor: Actor, db: DB):
             "pilot_unavailable", "Pilot is not eligible to change availability", 403
         )
     if body.state == "online_available":
+        Incident = F["operations.operational_incidents"]
+        unresolved_safety_report = await db.scalar(
+            select(Incident.id)
+            .where(
+                Incident.pilot_id == pilot.id,
+                Incident.safety_emergency.is_(True),
+                Incident.status.in_(["open", "acknowledged"]),
+            )
+            .limit(1)
+        )
+        if unresolved_safety_report:
+            raise BusinessError(
+                "incident_review_pending",
+                "Operations must resolve the safety report before you can go online",
+                409,
+            )
         if not pilot.location_consent_at:
             raise BusinessError(
                 "location_consent_required",
@@ -1250,23 +1648,457 @@ async def my_availability(body: s.PilotAvailabilityIn, actor: Actor, db: DB):
             )
         pilot.available = True
     else:
-        active = await db.scalar(
+        if body.state in {"offline", "on_break"}:
+            # Do not clear presence or start a break while a pending offer or work item
+            # still expects this pilot's response. A distinct unavailable state remains
+            # available for operational exceptions while preserving assignment ownership.
+            active = await db.scalar(
+                select(m.Assignment.id)
+                .where(
+                    m.Assignment.pilot_id == pilot.id,
+                    m.Assignment.status.in_(["offered", "accepted", "picked_up"]),
+                )
+                .limit(1)
+            )
+            if active:
+                raise BusinessError(
+                    "active_assignment",
+                    "Reject open offers or complete/reassign work before going offline "
+                    "or taking a break",
+                    409,
+                )
+        pilot.available = False
+    pilot.state = body.state
+    return pilot
+
+
+@router.get("/pilots/me", tags=["Fulfillment"])
+async def my_pilot_profile(actor: Actor, db: DB):
+    pilot = await db.scalar(select(m.Pilot).where(m.Pilot.user_id == UUID(actor.subject)))
+    if not pilot:
+        raise BusinessError("pilot_profile_required", "Create a pilot profile first", 403)
+    return {
+        "id": pilot.id,
+        "city_id": pilot.city_id,
+        "verified": pilot.verified,
+        "state": pilot.state,
+        "available": pilot.available,
+        "vehicle_type": pilot.vehicle_type,
+        "max_active_tasks": pilot.max_active_tasks,
+        "location_consent": pilot.location_consent_at is not None,
+    }
+
+
+@router.get("/pilots/me/assignments", tags=["Fulfillment"])
+async def my_pilot_assignments(actor: Actor, db: DB, limit: Limit = 50):
+    pilot = await db.scalar(select(m.Pilot).where(m.Pilot.user_id == UUID(actor.subject)))
+    if not pilot:
+        raise BusinessError("pilot_profile_required", "Create a pilot profile first", 403)
+    rows = (
+        await db.execute(
+            select(
+                m.Assignment,
+                m.DeliveryTask,
+                m.FulfillmentUnit,
+                m.MerchantOrder,
+                m.Branch,
+                m.Brand,
+                m.Window,
+            )
+            .join(m.DeliveryTask, m.Assignment.task_id == m.DeliveryTask.id)
+            .join(m.FulfillmentUnit, m.DeliveryTask.fulfillment_unit_id == m.FulfillmentUnit.id)
+            .join(m.MerchantOrder, m.FulfillmentUnit.merchant_order_id == m.MerchantOrder.id)
+            .join(m.Branch, m.MerchantOrder.branch_id == m.Branch.id)
+            .join(m.Brand, m.Branch.brand_id == m.Brand.id)
+            .join(m.Window, m.FulfillmentUnit.window_id == m.Window.id)
+            .where(
+                m.Assignment.pilot_id == pilot.id,
+                m.Assignment.status.in_(["offered", "accepted", "picked_up"]),
+            )
+            .order_by(m.Assignment.expires_at, m.Assignment.created_at, m.Assignment.id)
+            .limit(limit)
+        )
+    ).all()
+    child_ids = {child.id for _, _, _, child, _, _, _ in rows}
+    item_rows = (
+        (
+            await db.scalars(
+                select(m.OrderItem)
+                .where(m.OrderItem.merchant_order_id.in_(child_ids))
+                .order_by(m.OrderItem.created_at, m.OrderItem.id)
+            )
+        ).all()
+        if child_ids
+        else []
+    )
+    items_by_child = {}
+    for item in item_rows:
+        items_by_child.setdefault(item.merchant_order_id, []).append(
+            {
+                "name": item.product_name,
+                "variant": item.variant_name,
+                "quantity": item.quantity,
+                "unit": item.unit,
+            }
+        )
+    return {
+        "pilot": {
+            "id": pilot.id,
+            "city_id": pilot.city_id,
+            "state": pilot.state,
+            "verified": pilot.verified,
+            "available": pilot.available,
+        },
+        "items": [
+            {
+                "assignment_id": assignment.id,
+                "assignment_status": assignment.status,
+                "expires_at": assignment.expires_at,
+                "delivery_task_id": task.id,
+                "task_status": task.status,
+                "task_version": task.version,
+                "merchant_order_status": child.status,
+                "order_reference": str(child.order_id).split("-")[0].upper(),
+                "merchant_order_id": child.id,
+                "merchant_name": branch.name,
+                "merchant_type": brand.merchant_type,
+                "delivery_method": unit.delivery_method,
+                "pickup": {
+                    "name": branch.name,
+                    "latitude": str(branch.latitude),
+                    "longitude": str(branch.longitude),
+                },
+                # Exact customer address is disclosed only after assignment acceptance.
+                "dropoff": unit.address_snapshot
+                if assignment.status in {"accepted", "picked_up"}
+                else None,
+                "window_starts_at": window.starts_at,
+                "window_ends_at": window.ends_at,
+                "order_items": items_by_child.get(child.id, []),
+            }
+            for assignment, task, unit, child, branch, brand, window in rows
+        ],
+    }
+
+
+@router.get("/pilots/me/earnings", tags=["Finance"])
+async def my_pilot_earnings(actor: Actor, db: DB, limit: Limit = 100):
+    pilot = await db.scalar(select(m.Pilot).where(m.Pilot.user_id == UUID(actor.subject)))
+    if not pilot:
+        raise BusinessError("pilot_profile_required", "Create a pilot profile first", 403)
+    Earning, Currency = F["fulfillment.pilot_earnings"], m.Currency
+    rows = (
+        await db.execute(
+            select(Earning, Currency.code)
+            .join(Currency, Earning.currency_id == Currency.id)
+            .where(Earning.pilot_id == pilot.id)
+            .order_by(Earning.created_at.desc(), Earning.id.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "items": [
+            {
+                "id": earning.id,
+                "task_id": earning.task_id,
+                "amount": earning.amount,
+                "currency": currency,
+                "recorded_at": earning.created_at,
+            }
+            for earning, currency in rows
+        ],
+        "authoritative_source": "fulfillment.pilot_earnings",
+        "payout_status": "not_exposed_by_current_api",
+    }
+
+
+@router.get("/pilots/me/operations", tags=["Fulfillment"])
+async def my_pilot_operations(actor: Actor, db: DB):
+    """Return only the authenticated pilot's shift, capabilities, and service zones."""
+    pilot = await db.scalar(select(m.Pilot).where(m.Pilot.user_id == UUID(actor.subject)))
+    if not pilot:
+        raise BusinessError("pilot_profile_required", "Create a pilot profile first", 403)
+    instant = now()
+    Shift = F["fulfillment.pilot_shifts"]
+    shift = await db.scalar(
+        select(Shift)
+        .where(Shift.pilot_id == pilot.id, Shift.ends_at > instant)
+        .order_by(Shift.starts_at, Shift.id)
+        .limit(1)
+    )
+    ServiceZone = F["fulfillment.pilot_service_zones"]
+    zones = (
+        await db.execute(
+            select(m.Zone.id, m.Zone.name)
+            .join(ServiceZone, ServiceZone.zone_id == m.Zone.id)
+            .where(
+                ServiceZone.pilot_id == pilot.id,
+                m.Zone.city_id == pilot.city_id,
+                m.Zone.active.is_(True),
+            )
+            .order_by(m.Zone.name, m.Zone.id)
+            .limit(20)
+        )
+    ).all()
+    Capability = F["fulfillment.pilot_capabilities"]
+    capabilities = (
+        await db.scalars(
+            select(Capability.capability)
+            .where(
+                Capability.pilot_id == pilot.id,
+                or_(Capability.expires_at.is_(None), Capability.expires_at > instant),
+            )
+            .order_by(Capability.capability)
+        )
+    ).all()
+    remaining = (
+        max(0, int((shift.ends_at - instant).total_seconds() // 60))
+        if shift and shift.starts_at <= instant
+        else None
+    )
+    return {
+        "pilot_id": pilot.id,
+        "city_id": pilot.city_id,
+        "vehicle_type": pilot.vehicle_type,
+        "capabilities": list(capabilities),
+        "shift": (
+            {
+                "starts_at": shift.starts_at,
+                "ends_at": shift.ends_at,
+                "status": "active" if shift.starts_at <= instant else "upcoming",
+                "remaining_minutes": remaining,
+            }
+            if shift
+            else None
+        ),
+        "authorized_zones": [{"id": zone_id, "name": name} for zone_id, name in zones],
+        "breaks": "not_configured",
+        "schedule_authority": "fulfillment.pilot_shifts",
+    }
+
+
+@router.get("/pilots/me/supply-demand", tags=["Fulfillment"])
+async def my_pilot_supply_demand(actor: Actor, db: DB):
+    """Provide coarse, advisory demand signals for only the pilot's authorized zones."""
+    pilot = await db.scalar(select(m.Pilot).where(m.Pilot.user_id == UUID(actor.subject)))
+    if not pilot:
+        raise BusinessError("pilot_profile_required", "Create a pilot profile first", 403)
+    city = await Repository(db).require(m.City, pilot.city_id)
+    ServiceZone = F["fulfillment.pilot_service_zones"]
+    zones = (
+        await db.execute(
+            select(m.Zone.id, m.Zone.name)
+            .join(ServiceZone, ServiceZone.zone_id == m.Zone.id)
+            .where(
+                ServiceZone.pilot_id == pilot.id,
+                m.Zone.city_id == pilot.city_id,
+                m.Zone.active.is_(True),
+            )
+            .order_by(m.Zone.name, m.Zone.id)
+            .limit(5)
+        )
+    ).all()
+    Forecast = F["intelligence.ai_forecast_outputs"]
+    signals = []
+    for zone_id, name in zones:
+        cached = await db.scalar(
+            select(Forecast)
+            .where(
+                Forecast.zone_id == zone_id,
+                Forecast.expires_at > now(),
+            )
+            .order_by(Forecast.source_cutoff.desc(), Forecast.id.desc())
+            .limit(1)
+        )
+        forecast = (
+            cached.forecast
+            if cached
+            else await ai_service.city_demand_forecast(db, city, zone_id=zone_id)
+        )
+        if not cached:
+            await add(
+                db,
+                Forecast,
+                city_id=city.id,
+                zone_id=zone_id,
+                interval_minutes=60,
+                forecast=forecast,
+                provenance=forecast["provenance"],
+                feature_schema_version=forecast["feature_schema_version"],
+                source_cutoff=now(),
+                expires_at=now() + timedelta(minutes=15),
+            )
+            await ai_service.log_prediction(
+                db,
+                "demand",
+                actor.subject,
+                "pilot_zone_demand_signal",
+                {"zone_id": str(zone_id)},
+                {"model_status": forecast["model_status"]},
+            )
+        model_status = forecast.get("model_status", "unknown")
+        expected = forecast.get("horizons", {}).get("next_1_hour")
+        if model_status == "cold_start_fallback" or expected is None:
+            band = "insufficient_history"
+            recommendation = "No reliable demand history is available for this zone yet."
+        elif expected >= 4:
+            band = "high"
+            recommendation = "Higher demand is forecast; repositioning is optional."
+        elif expected >= 1:
+            band = "moderate"
+            recommendation = "Some demand is forecast; repositioning is optional."
+        else:
+            band = "low"
+            recommendation = "Demand is forecast to be quieter."
+        signals.append(
+            {
+                "zone_id": zone_id,
+                "zone_name": name,
+                "window": "next_hour",
+                "signal_type": "prediction",
+                "demand_band": band,
+                "recommendation": recommendation,
+                "generated_at": forecast.get("generated_at"),
+                "model_status": model_status,
+                "provenance": forecast.get("provenance", "unknown"),
+            }
+        )
+    return {
+        "city_id": pilot.city_id,
+        "signals": signals,
+        "pilot_supply": "zone_level_supply_unavailable",
+        "advisory_only": True,
+        "limitations": (
+            "No zone-level pilot supply, travel-time recommendation, incentives, "
+            "or trained demand model is configured."
+        ),
+    }
+
+
+@router.post("/pilots/me/incidents", status_code=201, tags=["Fulfillment"])
+async def report_pilot_incident(body: s.PilotIncidentIn, actor: Actor, request: Request, db: DB):
+    """Persist a pilot safety/operations report in the shared incident ledger."""
+    pilot = await db.scalar(
+        select(m.Pilot).where(m.Pilot.user_id == UUID(actor.subject)).with_for_update()
+    )
+    if not pilot:
+        raise BusinessError("pilot_profile_required", "Create a pilot profile first", 403)
+    if body.delivery_task_id:
+        task = await Repository(db).require(m.DeliveryTask, body.delivery_task_id)
+        assignment = await db.scalar(
             select(m.Assignment.id)
             .where(
+                m.Assignment.task_id == task.id,
                 m.Assignment.pilot_id == pilot.id,
                 m.Assignment.status.in_(["accepted", "picked_up"]),
             )
             .limit(1)
         )
-        if active and body.state == "offline":
-            raise BusinessError(
-                "active_delivery",
-                "Complete or reassign active deliveries before going offline",
-                409,
-            )
+        if not assignment:
+            raise BusinessError("incident_task_forbidden", "Task is not active for this pilot", 403)
+        _task, _unit, _child, branch = await logistics.task_context(db, task.id)
+        if branch.city_id != pilot.city_id:
+            raise BusinessError("incident_task_forbidden", "Task is outside the pilot city", 403)
+
+    critical_categories = {"accident", "medical_emergency"}
+    high_categories = {
+        "vehicle_breakdown",
+        "road_blockage",
+        "unsafe_pickup_area",
+        "unsafe_delivery_area",
+        "severe_weather",
+    }
+    must_stop = body.safety_emergency or body.category in critical_categories | high_categories
+    severity = (
+        "critical"
+        if body.safety_emergency or body.category in critical_categories
+        else ("high" if body.category in high_categories else "normal")
+    )
+    Incident = F["operations.operational_incidents"]
+    incident = await add(
+        db,
+        Incident,
+        city_id=pilot.city_id,
+        pilot_id=pilot.id,
+        delivery_task_id=body.delivery_task_id,
+        reporter_id=UUID(actor.subject),
+        category=body.category,
+        severity=severity,
+        summary=body.summary,
+        status="open",
+        safety_emergency=must_stop,
+    )
+    if must_stop and pilot.state != "suspended":
         pilot.available = False
-    pilot.state = body.state
-    return pilot
+        pilot.state = "unavailable"
+    await audit(
+        db,
+        actor,
+        "pilot_incident.create",
+        incident.id,
+        request.state.request_id,
+        current="open",
+    )
+    await event(
+        db,
+        "pilot.incident_reported",
+        incident.id,
+        request.state.request_id,
+        pilot_id=pilot.id,
+        reporter_id=actor.subject,
+        city_id=pilot.city_id,
+        severity=severity,
+    )
+    return {
+        "id": incident.id,
+        "status": incident.status,
+        "category": incident.category,
+        "severity": incident.severity,
+        "safety_emergency": incident.safety_emergency,
+        "created_at": incident.created_at,
+        "next_step": (
+            "Do not accept new work. Move to safety and contact local emergency services "
+            "if you are in immediate danger. The report is saved for operations review; "
+            "staff must resolve it before you can go online again."
+            if must_stop
+            else "The incident report is saved for operations review."
+        ),
+    }
+
+
+@router.get("/pilots/me/incidents", tags=["Fulfillment"])
+async def my_pilot_incidents(actor: Actor, db: DB, limit: Limit = 50):
+    pilot = await db.scalar(select(m.Pilot).where(m.Pilot.user_id == UUID(actor.subject)))
+    if not pilot:
+        raise BusinessError("pilot_profile_required", "Create a pilot profile first", 403)
+    Incident = F["operations.operational_incidents"]
+    rows = (
+        await db.scalars(
+            select(Incident)
+            .where(
+                Incident.pilot_id == pilot.id,
+                Incident.reporter_id == UUID(actor.subject),
+            )
+            .order_by(Incident.created_at.desc(), Incident.id.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "delivery_task_id": row.delivery_task_id,
+                "category": row.category,
+                "severity": row.severity,
+                "status": row.status,
+                "safety_emergency": row.safety_emergency,
+                "summary": row.summary,
+                "resolution_summary": row.resolution_summary,
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ]
+    }
 
 
 @router.post("/pilots/me/location-consent", tags=["Fulfillment"])
@@ -1549,6 +2381,117 @@ async def accept(assignment_id: UUID, actor: Actor, request: Request, db: DB):
 async def reject_assignment(assignment_id: UUID, actor: Actor, request: Request, db: DB):
     task = await logistics.reject_offer(db, actor, assignment_id, request.state.request_id)
     return {"id": task.id, "status": task.status, "version": task.version}
+
+
+@router.get("/operations/cities/{city_id}/pilot-incidents", tags=["Dispatch operations"])
+async def city_pilot_incidents(
+    city_id: UUID, actor: Actor, request: Request, db: DB, limit: Limit = 50
+):
+    city = await Repository(db).require(m.City, city_id)
+    await scoped(db, actor, "dispatch.write", city_id=city.id)
+    Incident = F["operations.operational_incidents"]
+    rows = (
+        await db.scalars(
+            select(Incident)
+            .where(Incident.city_id == city.id, Incident.reporter_id.is_not(None))
+            .order_by(Incident.created_at.desc(), Incident.id.desc())
+            .limit(limit)
+        )
+    ).all()
+    for row in rows:
+        await audit(db, actor, "pilot_incident.read", row.id, request.state.request_id)
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "pilot_id": row.pilot_id,
+                "delivery_task_id": row.delivery_task_id,
+                "category": row.category,
+                "severity": row.severity,
+                "status": row.status,
+                "safety_emergency": row.safety_emergency,
+                "summary": row.summary,
+                "resolution_summary": row.resolution_summary,
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.post("/operations/pilot-incidents/{incident_id}/acknowledge", tags=["Dispatch operations"])
+async def acknowledge_pilot_incident(incident_id: UUID, actor: Actor, request: Request, db: DB):
+    Incident = F["operations.operational_incidents"]
+    incident = await db.scalar(select(Incident).where(Incident.id == incident_id).with_for_update())
+    if not incident or incident.reporter_id is None:
+        raise BusinessError("incident_not_found", "Pilot incident was not found", 404)
+    await scoped(db, actor, "dispatch.write", city_id=incident.city_id)
+    if incident.status == "acknowledged":
+        return {"id": incident.id, "status": incident.status}
+    if incident.status != "open":
+        raise BusinessError("incident_not_open", "Only open incidents can be acknowledged", 409)
+    incident.status = "acknowledged"
+    await audit(
+        db,
+        actor,
+        "pilot_incident.acknowledge",
+        incident.id,
+        request.state.request_id,
+        previous="open",
+        current="acknowledged",
+    )
+    await event(
+        db,
+        "pilot.incident_acknowledged",
+        incident.id,
+        request.state.request_id,
+        city_id=incident.city_id,
+        pilot_id=incident.pilot_id,
+    )
+    return {"id": incident.id, "status": incident.status}
+
+
+@router.post("/operations/pilot-incidents/{incident_id}/resolve", tags=["Dispatch operations"])
+async def resolve_pilot_incident(
+    incident_id: UUID,
+    body: s.PilotIncidentResolveIn,
+    actor: Actor,
+    request: Request,
+    db: DB,
+):
+    Incident = F["operations.operational_incidents"]
+    incident = await db.scalar(select(Incident).where(Incident.id == incident_id).with_for_update())
+    if not incident or incident.reporter_id is None:
+        raise BusinessError("incident_not_found", "Pilot incident was not found", 404)
+    await scoped(db, actor, "dispatch.write", city_id=incident.city_id)
+    if incident.status == "resolved":
+        return {"id": incident.id, "status": incident.status}
+    if incident.status != "acknowledged":
+        raise BusinessError(
+            "incident_not_acknowledged",
+            "Acknowledge the incident before resolving",
+            409,
+        )
+    incident.status = "resolved"
+    incident.resolution_summary = body.resolution_summary
+    await audit(
+        db,
+        actor,
+        "pilot_incident.resolve",
+        incident.id,
+        request.state.request_id,
+        previous="acknowledged",
+        current="resolved",
+    )
+    await event(
+        db,
+        "pilot.incident_resolved",
+        incident.id,
+        request.state.request_id,
+        city_id=incident.city_id,
+        pilot_id=incident.pilot_id,
+    )
+    return {"id": incident.id, "status": incident.status}
 
 
 @router.get("/operations/cities/{city_id}/dispatch", tags=["Dispatch operations"])
@@ -2531,6 +3474,172 @@ async def refund(payment_id: UUID, body: s.RefundIn, actor: Actor, request: Requ
     )
 
 
+async def _support_scope(db, actor):
+    user = await db.get(m.User, UUID(actor.subject))
+    if not user or user.status != "active":
+        raise BusinessError("forbidden", "Access denied", 403)
+    rows = (
+        await db.execute(
+            select(m.RoleAssignment, m.Role.name)
+            .join(m.Role, m.Role.id == m.RoleAssignment.role_id)
+            .join(m.RolePermission, m.RolePermission.role_id == m.Role.id)
+            .join(m.Permission, m.Permission.id == m.RolePermission.permission_id)
+            .where(m.RoleAssignment.user_id == user.id, m.Permission.code == "support.write")
+        )
+    ).all()
+    global_support = any(
+        role in {"support_agent", "platform_super_admin"}
+        and assignment.organization_id is None
+        and assignment.city_id is None
+        and assignment.branch_id is None
+        for assignment, role in rows
+    )
+    organization_ids = {
+        assignment.organization_id
+        for assignment, _role in rows
+        if assignment.organization_id is not None
+        and assignment.city_id is None
+        and assignment.branch_id is None
+        and await db.scalar(
+            select(m.Membership.id).where(
+                m.Membership.user_id == user.id,
+                m.Membership.organization_id == assignment.organization_id,
+                m.Membership.status == "active",
+            )
+        )
+    }
+    return global_support, organization_ids
+
+
+async def _support_ticket_access(db, actor, ticket):
+    global_support, organization_ids = await _support_scope(db, actor)
+    if global_support or ticket.organization_id in organization_ids:
+        return
+    raise BusinessError("forbidden", "Ticket is outside your support assignment scope", 403)
+
+
+@router.get("/support/tickets", tags=["Operations"])
+async def support_queue(
+    actor: Actor, request: Request, db: DB, cursor: str | None = None, limit: Limit = 50
+):
+    global_support, organization_ids = await _support_scope(db, actor)
+    if not global_support and not organization_ids:
+        raise BusinessError("forbidden", "An active support assignment is required", 403)
+    predicates = [
+        or_(m.Ticket.assigned_to_id.is_(None), m.Ticket.assigned_to_id == UUID(actor.subject))
+    ]
+    if not global_support:
+        predicates.append(m.Ticket.organization_id.in_(organization_ids))
+    tickets, next_id = await Repository(db).page(
+        m.Ticket, predicates, after=decode_cursor(cursor), limit=limit
+    )
+    for row in tickets:
+        await audit(
+            db, actor, "support.ticket.read", row.id, request.state.request_id, row.organization_id
+        )
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "subject": row.subject,
+                "status": row.status,
+                "order_id": row.order_id,
+                "created_at": row.created_at,
+                "assigned_to_me": row.assigned_to_id == UUID(actor.subject),
+            }
+            for row in tickets
+        ],
+        "next_cursor": base64.urlsafe_b64encode(next_id.bytes).decode().rstrip("=")
+        if next_id
+        else None,
+    }
+
+
+@router.post("/support/tickets/{ticket_id}/claim", tags=["Operations"])
+async def claim_support_ticket(ticket_id: UUID, actor: Actor, request: Request, db: DB):
+    ticket = await Repository(db).require(m.Ticket, ticket_id, lock=True)
+    await _support_ticket_access(db, actor, ticket)
+    if ticket.assigned_to_id is not None and ticket.assigned_to_id != UUID(actor.subject):
+        raise BusinessError("ticket_claimed", "Ticket is already assigned to another agent", 409)
+    if ticket.status == "resolved":
+        raise BusinessError("ticket_resolved", "Resolved tickets cannot be claimed", 409)
+    if ticket.assigned_to_id is None:
+        previous = ticket.status
+        ticket.assigned_to_id = UUID(actor.subject)
+        ticket.status = "assigned"
+        await audit(
+            db,
+            actor,
+            "support.ticket_claim",
+            ticket.id,
+            request.state.request_id,
+            ticket.organization_id,
+            previous=previous,
+            current="assigned",
+        )
+    return {"id": ticket.id, "status": ticket.status, "assigned_to_me": True}
+
+
+@router.get("/support/tickets/{ticket_id}/messages", tags=["Operations"])
+async def support_ticket_messages(ticket_id: UUID, actor: Actor, request: Request, db: DB):
+    ticket = await Repository(db).require(m.Ticket, ticket_id)
+    await _support_ticket_access(db, actor, ticket)
+    if ticket.assigned_to_id != UUID(actor.subject):
+        raise BusinessError(
+            "ticket_not_claimed", "Claim this ticket before reading its conversation", 403
+        )
+    await audit(
+        db,
+        actor,
+        "support.ticket_conversation.read",
+        ticket.id,
+        request.state.request_id,
+        ticket.organization_id,
+    )
+    messages = (
+        await db.scalars(
+            select(m.TicketMessage)
+            .where(m.TicketMessage.ticket_id == ticket.id)
+            .order_by(m.TicketMessage.created_at, m.TicketMessage.id)
+        )
+    ).all()
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "body": row.body,
+                "author": "agent" if row.author_id == UUID(actor.subject) else "customer",
+                "created_at": row.created_at,
+            }
+            for row in messages
+        ]
+    }
+
+
+@router.post("/support/tickets/{ticket_id}/resolve", tags=["Operations"])
+async def resolve_support_ticket(ticket_id: UUID, actor: Actor, request: Request, db: DB):
+    ticket = await Repository(db).require(m.Ticket, ticket_id, lock=True)
+    await _support_ticket_access(db, actor, ticket)
+    if ticket.assigned_to_id != UUID(actor.subject):
+        raise BusinessError(
+            "ticket_not_assigned", "Only the assigned agent can resolve this ticket", 403
+        )
+    if ticket.status == "resolved":
+        return {"id": ticket.id, "status": ticket.status}
+    ticket.status = "resolved"
+    await audit(
+        db,
+        actor,
+        "support.ticket_resolve",
+        ticket.id,
+        request.state.request_id,
+        ticket.organization_id,
+        previous="assigned",
+        current="resolved",
+    )
+    return {"id": ticket.id, "status": ticket.status}
+
+
 @router.post("/support/tickets", response_model=s.StateOut, status_code=201, tags=["Operations"])
 async def ticket(body: s.TicketIn, actor: Actor, db: DB):
     if body.order_id:
@@ -2545,15 +3654,28 @@ async def ticket(body: s.TicketIn, actor: Actor, db: DB):
     status_code=201,
     tags=["Operations"],
 )
-async def message(ticket_id: UUID, body: s.MessageIn, actor: Actor, db: DB):
+async def message(ticket_id: UUID, body: s.MessageIn, actor: Actor, request: Request, db: DB):
     ticket = await Repository(db).require(m.Ticket, ticket_id)
-    if str(ticket.user_id) != actor.subject:
-        if ticket.organization_id is None:
-            raise BusinessError("forbidden", "Ticket is not scoped to your organization", 403)
-        await scoped(db, actor, "support.write", ticket.organization_id)
-    return await add(
+    agent_reply = str(ticket.user_id) != actor.subject
+    if agent_reply:
+        await _support_ticket_access(db, actor, ticket)
+        if ticket.assigned_to_id != UUID(actor.subject):
+            raise BusinessError("ticket_not_assigned", "Claim this ticket before replying", 403)
+    if ticket.status == "resolved":
+        raise BusinessError("ticket_resolved", "Resolved tickets cannot receive messages", 409)
+    created = await add(
         db, m.TicketMessage, ticket_id=ticket.id, author_id=UUID(actor.subject), body=body.body
     )
+    if agent_reply:
+        await audit(
+            db,
+            actor,
+            "support.ticket_reply",
+            ticket.id,
+            request.state.request_id,
+            ticket.organization_id,
+        )
+    return created
 
 
 @router.get("/audit/events", response_model=s.Page[s.AuditOut], tags=["Operations"])

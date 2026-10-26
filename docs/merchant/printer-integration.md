@@ -1,0 +1,3 @@
+# Kitchen printer integration boundary
+
+`backend/integrations/printers/contracts.py` defines immutable kitchen-ticket lines, ticket metadata, print results, and a hardware-neutral async `PrinterAdapter` port. Local protocol smoke tests use an in-memory fixture to exercise accepted/duplicate result shapes. No Bluetooth/network discovery, ESC/POS rendering, durable print deduplication, reprint audit service, printer settings, or physical printer was available or implemented. No actual print has been tested. A provider must make idempotency durable across restarts and label reprints with an operator reason before hardware deployment.

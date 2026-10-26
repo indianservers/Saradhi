@@ -159,7 +159,7 @@ async def accept(session, actor, assignment_id, request_id):
     assignment = await session.scalar(
         select(m.Assignment).where(m.Assignment.id == assignment_id).with_for_update()
     )
-    pilot = await Repository(session).require(m.Pilot, assignment.pilot_id)
+    pilot = await Repository(session).require(m.Pilot, assignment.pilot_id, lock=True)
     owned(actor, pilot.user_id)
     if not pilot.verified:
         raise BusinessError("pilot_unverified", "Pilot verification has been revoked", 403)
@@ -167,6 +167,22 @@ async def accept(session, actor, assignment_id, request_id):
         return task
     if assignment.status != "offered" or assignment.expires_at <= now():
         raise BusinessError("offer_expired", "Offer is unavailable or expired")
+    if pilot.state not in {"offer_pending", "assigned"}:
+        raise BusinessError(
+            "pilot_unavailable",
+            "Pilot must be online and available to accept this offer",
+            409,
+        )
+    active_count = await session.scalar(
+        select(func.count())
+        .select_from(m.Assignment)
+        .where(
+            m.Assignment.pilot_id == pilot.id,
+            m.Assignment.status.in_(["offered", "accepted", "picked_up"]),
+        )
+    )
+    if int(active_count or 0) > pilot.max_active_tasks:
+        raise BusinessError("pilot_capacity", "Pilot task capacity has been reached", 409)
     transition("delivery", task.status, "assigned")
     assignment.status = "accepted"
     task.status, task.version = "assigned", task.version + 1

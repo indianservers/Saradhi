@@ -48,6 +48,7 @@ Collection limits are 1..100, cursors opaque, and sort/filter predicates are all
 - `GET /api/v1/merchants/branches/{branch_id}/windows` — Windows. Public transport; endpoint-specific rate/provider verification applies.
 - `POST /api/v1/inventory/branches/{branch_id}/adjustments` — Adjust Stock. Bearer plus resource/scope authorization.
 - `POST /api/v1/inventory/branches/{branch_id}/batches` — Receive Batch. Bearer plus resource/scope authorization.
+- `GET /api/v1/inventory/branches/{branch_id}/batches` — Stock Batches. Bearer plus resource/scope authorization.
 - `GET /api/v1/inventory/branches/{branch_id}` — Stock Status. Bearer plus resource/scope authorization.
 - `POST /api/v1/carts` — Cart. Bearer plus resource/scope authorization.
 - `GET /api/v1/carts/{cart_id}` — Get Cart. Bearer plus resource/scope authorization.
@@ -63,11 +64,23 @@ Collection limits are 1..100, cursors opaque, and sort/filter predicates are all
 - `GET /api/v1/orders/{order_id}/merchant-orders` — Children. Bearer plus resource/scope authorization.
 - `GET /api/v1/orders/{order_id}/reorder-lines` — Reorder Lines. Bearer plus resource/scope authorization.
 - `GET /api/v1/merchant/branches/{branch_id}/orders` — Merchant Order Queue. Bearer plus resource/scope authorization.
+- `POST /api/v1/merchant/branches/{branch_id}/kitchen/stations` — Create Kitchen Station. Bearer plus resource/scope authorization.
+- `GET /api/v1/merchant/branches/{branch_id}/kitchen/stations` — Kitchen Stations. Bearer plus resource/scope authorization.
+- `GET /api/v1/merchant/branches/{branch_id}/kitchen/tasks` — Kitchen Tasks. Bearer plus resource/scope authorization.
+- `PUT /api/v1/merchant/kitchen/tasks/{task_id}/station` — Reassign Kitchen Task. Bearer plus resource/scope authorization.
+- `POST /api/v1/merchant/kitchen/tasks/{task_id}/transition` — Transition Kitchen Task. Bearer plus resource/scope authorization.
 - `POST /api/v1/merchant-orders/{child_id}/transition` — Child Transition. Bearer plus resource/scope authorization.
 - `POST /api/v1/pilots` — Pilot. Bearer plus resource/scope authorization.
 - `POST /api/v1/pilots/{pilot_id}/verify` — Verify Pilot. Bearer plus resource/scope authorization.
 - `PUT /api/v1/pilots/{pilot_id}/availability` — Availability. Bearer plus resource/scope authorization.
 - `POST /api/v1/pilots/me/availability` — My Availability. Bearer plus resource/scope authorization.
+- `GET /api/v1/pilots/me` — My Pilot Profile. Bearer plus resource/scope authorization.
+- `GET /api/v1/pilots/me/assignments` — My Pilot Assignments. Bearer plus resource/scope authorization.
+- `GET /api/v1/pilots/me/earnings` — My Pilot Earnings. Bearer plus resource/scope authorization.
+- `GET /api/v1/pilots/me/operations` — My Pilot Operations. Bearer plus resource/scope authorization.
+- `GET /api/v1/pilots/me/supply-demand` — My Pilot Supply Demand. Bearer plus resource/scope authorization.
+- `POST /api/v1/pilots/me/incidents` — Report Pilot Incident. Bearer plus resource/scope authorization.
+- `GET /api/v1/pilots/me/incidents` — My Pilot Incidents. Bearer plus resource/scope authorization.
 - `POST /api/v1/pilots/me/location-consent` — Pilot Location Consent. Bearer plus resource/scope authorization.
 - `POST /api/v1/pilots/me/location` — My Location. Bearer plus resource/scope authorization.
 - `GET /api/v1/orders/{order_id}/tracking` — Order Tracking. Bearer plus resource/scope authorization.
@@ -79,6 +92,9 @@ Collection limits are 1..100, cursors opaque, and sort/filter predicates are all
 - `POST /api/v1/delivery-tasks/{task_id}/offer` — Offer. Bearer plus resource/scope authorization.
 - `POST /api/v1/pilot-assignments/{assignment_id}/accept` — Accept. Bearer plus resource/scope authorization.
 - `POST /api/v1/pilot-assignments/{assignment_id}/reject` — Reject Assignment. Bearer plus resource/scope authorization.
+- `GET /api/v1/operations/cities/{city_id}/pilot-incidents` — City Pilot Incidents. Bearer plus resource/scope authorization.
+- `POST /api/v1/operations/pilot-incidents/{incident_id}/acknowledge` — Acknowledge Pilot Incident. Bearer plus resource/scope authorization.
+- `POST /api/v1/operations/pilot-incidents/{incident_id}/resolve` — Resolve Pilot Incident. Bearer plus resource/scope authorization.
 - `GET /api/v1/operations/cities/{city_id}/dispatch` — City Dispatch. Bearer plus resource/scope authorization.
 - `GET /api/v1/operations/cities/{city_id}/fleet` — City Fleet. Bearer plus resource/scope authorization.
 - `GET /api/v1/ai/demand/cities/{city_id}/forecast` — Ai City Forecast. Bearer plus resource/scope authorization.
@@ -132,4 +148,4 @@ No default privileged account exists. Provision only a named existing user via t
 Complete real-database examples: tests/integration/helpers.py and test_vertical_slice.py.
 See api-security.md and error-contracts.md for authorization, precision, state and error behavior.
 Sandbox finance requires explicit enabling and never performs a real financial transaction.
-Total documented HTTP operations: 118.
+Total documented HTTP operations: 134.

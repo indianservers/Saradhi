@@ -1,12 +1,13 @@
 from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import or_, select, text, tuple_, update
+from sqlalchemy import func, or_, select, text, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
 
+from ai_platform.inference.service import preparation_rule
 from backend.application import batches
 from backend.application.common import add, audit, branch_scope, event, now, owned
 from backend.domain.rules import BusinessError, money, transition
@@ -531,6 +532,102 @@ async def release_reservation(session, reservation, actor_id, request_id):
     await event(session, "inventory.released", reservation.id, request_id)
 
 
+async def _ensure_kitchen_tasks(session, child, branch):
+    """Create immutable per-line prep work plus a packaging gate in the order transaction."""
+    existing = await session.scalar(
+        select(m.KitchenTask.id).where(m.KitchenTask.merchant_order_id == child.id).limit(1)
+    )
+    if existing:
+        return
+    station_rows = {}
+    for name, packaging, capacity in (
+        ("Main Kitchen", False, 8),
+        ("Packaging", True, 4),
+    ):
+        await session.execute(
+            insert(m.KitchenStation)
+            .values(
+                id=uuid4(),
+                branch_id=branch.id,
+                name=name,
+                is_packaging=packaging,
+                max_concurrent=capacity,
+                active=True,
+                version=1,
+            )
+            .on_conflict_do_nothing(index_elements=["branch_id", "name"])
+        )
+        station_rows[name] = await session.scalar(
+            select(m.KitchenStation)
+            .where(m.KitchenStation.branch_id == branch.id, m.KitchenStation.name == name)
+            .with_for_update()
+        )
+    items = (
+        await session.scalars(
+            select(m.OrderItem)
+            .where(m.OrderItem.merchant_order_id == child.id)
+            .order_by(m.OrderItem.id)
+        )
+    ).all()
+    if not items:
+        raise BusinessError("kitchen_items_missing", "Merchant order contains no preparation items")
+    queue_depth = await session.scalar(
+        select(func.count())
+        .select_from(m.MerchantOrder)
+        .where(
+            m.MerchantOrder.branch_id == branch.id,
+            m.MerchantOrder.status.in_(["accepted", "preparing"]),
+        )
+    )
+    estimate = preparation_rule(len(items), int(queue_depth or 0))
+    target = now() + timedelta(minutes=estimate["expected_duration_minutes"])
+    preparation_tasks = []
+    for item in items:
+        preparation_tasks.append(
+            await add(
+                session,
+                m.KitchenTask,
+                merchant_order_id=child.id,
+                order_item_id=item.id,
+                branch_id=branch.id,
+                station_id=station_rows["Main Kitchen"].id,
+                task_key=f"item:{item.id}:prep",
+                task_type="prep",
+                label=f"{item.product_name} · {item.variant_name}",
+                quantity=item.quantity,
+                status="pending",
+                version=1,
+                target_completed_at=target,
+                estimate_provenance=estimate["provenance"],
+                estimate_model_version=estimate["model_version"],
+            )
+        )
+    packing = await add(
+        session,
+        m.KitchenTask,
+        merchant_order_id=child.id,
+        order_item_id=None,
+        branch_id=branch.id,
+        station_id=station_rows["Packaging"].id,
+        task_key="order:packing",
+        task_type="packing",
+        label="Final pack verification",
+        quantity=Decimal("1"),
+        status="pending",
+        version=1,
+        target_completed_at=target,
+        estimate_provenance=estimate["provenance"],
+        estimate_model_version=estimate["model_version"],
+    )
+    for task in preparation_tasks:
+        await add(
+            session,
+            m.KitchenTaskDependency,
+            task_id=packing.id,
+            depends_on_task_id=task.id,
+        )
+
+
 async def merchant_transition(session, actor, child_id, target, version, request_id):
     candidate = await Repository(session).require(m.MerchantOrder, child_id)
     branch = await branch_scope(session, actor, candidate.branch_id)
@@ -540,6 +637,30 @@ async def merchant_transition(session, actor, child_id, target, version, request
         raise BusinessError("invalid_order", "Parent order is no longer active")
     if child.version != version:
         raise BusinessError("version_conflict", "Expected version does not match")
+    if target == "ready":
+        tasks_exist = await session.scalar(
+            select(m.KitchenTask.id).where(m.KitchenTask.merchant_order_id == child.id).limit(1)
+        )
+        if not tasks_exist:
+            raise BusinessError(
+                "kitchen_tasks_missing",
+                "Kitchen preparation tasks have not been initialized for this order",
+                409,
+            )
+        unfinished = await session.scalar(
+            select(m.KitchenTask.id)
+            .where(
+                m.KitchenTask.merchant_order_id == child.id,
+                m.KitchenTask.status != "completed",
+            )
+            .limit(1)
+        )
+        if unfinished:
+            raise BusinessError(
+                "kitchen_work_incomplete",
+                "Complete every preparation and packaging task before marking ready",
+                409,
+            )
     transition("merchant", child.status, target)
     reservations = (
         await session.scalars(
@@ -583,6 +704,7 @@ async def merchant_transition(session, actor, child_id, target, version, request
                 idempotency_key=f"deduct:{reservation.id}",
                 actor_id=UUID(actor.subject),
             )
+        await _ensure_kitchen_tasks(session, child, branch)
     if target in {"rejected", "cancelled"}:
         payment = await session.scalar(
             select(m.PaymentIntent).where(

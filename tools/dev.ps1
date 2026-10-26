@@ -47,6 +47,25 @@ switch ($Task) {
     foreach ($entry in @('android','ios','web','.metadata')) {
       if (!(Test-Path (Join-Path $target $entry))) { Copy-Item -LiteralPath (Join-Path $staging $entry) -Destination $target -Recurse }
     }
+    if ($App -eq 'pilot_app') {
+      $manifestPath = Join-Path $target 'android/app/src/main/AndroidManifest.xml'
+      if (Test-Path $manifestPath) {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw
+        if ($manifest -notmatch 'android.permission.ACCESS_FINE_LOCATION') {
+          $manifest = $manifest -replace '(<manifest[^>]*>)', ('$1' + "`n    <uses-permission android:name=`"android.permission.ACCESS_FINE_LOCATION`" />`n    <uses-permission android:name=`"android.permission.ACCESS_COARSE_LOCATION`" />")
+          Set-Content -LiteralPath $manifestPath -Value $manifest -NoNewline
+        }
+      }
+      $plistPath = Join-Path $target 'ios/Runner/Info.plist'
+      if (Test-Path $plistPath) {
+        $plist = Get-Content -LiteralPath $plistPath -Raw
+        if ($plist -notmatch 'NSLocationWhenInUseUsageDescription') {
+          $usage = "`n    <key>NSLocationWhenInUseUsageDescription</key>`n    <string>Quickbuddy uses your location while you are online to support dispatch and active deliveries.</string>"
+          $plist = $plist -replace '</dict>', ($usage + "`n</dict>")
+          Set-Content -LiteralPath $plistPath -Value $plist -NoNewline
+        }
+      }
+    }
     Push-Location $target
     try { flutter pub get; CheckExit; flutter analyze; CheckExit; flutter test; CheckExit } finally { Pop-Location }
     Write-Output "SDK staging retained for inspection: $staging"

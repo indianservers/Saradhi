@@ -585,6 +585,12 @@ async def test_fefo_batch_reservation_rejects_stock_expiring_before_delivery(api
             },
             shop["merchant"],
         )
+    listed_batches = await client.get(
+        f"/api/v1/inventory/branches/{branch_id}/batches?limit=100",
+        headers=shop["merchant"]["headers"],
+    )
+    assert listed_batches.status_code == 200, listed_batches.text
+    assert [row["lot_code"] for row in listed_batches.json()] == ["too-soon", "valid"]
     _, _, order, _ = await checkout(client, state["customer"], [shop])
     async with app.state.sessions() as db:
         Allocation, Batch = (

@@ -5,7 +5,8 @@
   "exports": {
     ".": "./src/index.tsx",
     "./styles.css": "./src/styles.css",
-    "./auth": "./src/auth.ts"
+    "./auth": "./src/auth.ts",
+    "./server-routes": "./src/server-routes.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

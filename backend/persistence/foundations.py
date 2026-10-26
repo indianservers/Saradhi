@@ -1391,9 +1391,15 @@ def register():
         },
         "operational_incidents": {
             "city_id": "geo.cities",
+            "pilot_id": "fulfillment.pilot_profiles?",
+            "delivery_task_id": "fulfillment.delivery_tasks?",
+            "reporter_id": "identity.users?",
+            "category": "text?",
             "severity": "text",
             "summary": "text",
+            "resolution_summary": "text?",
             "status": "text",
+            "safety_emergency": "bool",
         },
         "notification_jobs": {
             "user_id": "identity.users",

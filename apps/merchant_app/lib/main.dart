@@ -414,8 +414,11 @@ class KitchenScreen extends ConsumerStatefulWidget {
   @override ConsumerState<KitchenScreen> createState() => _KitchenScreenState();
 }
 class _KitchenScreenState extends ConsumerState<KitchenScreen> {
-  List<Map<String, dynamic>> orders = [];
+  List<Map<String, dynamic>> tasks = [], stations = [];
   bool loading = true;
+  bool syncing = false;
+  DateTime? lastSync;
+  String? selectedStation;
   String? error;
   Timer? timer;
   @override void initState() { super.initState(); _load(); timer = Timer.periodic(const Duration(seconds: 10), (_) => _load(silent: true)); }
@@ -423,30 +426,77 @@ class _KitchenScreenState extends ConsumerState<KitchenScreen> {
   Future<void> _load({bool silent = false}) async {
     final branch = selectedBranchStore.value;
     if (branch == null) { if (mounted) setState(() { loading = false; error = 'Select a branch first.'; }); return; }
-    try { final r = await ref.read(transportProvider).get('/api/v1/merchant/branches/${branch['id']}/orders?limit=100'); if (mounted) setState(() { orders = _rows(r.data).where((o) => const {'pending', 'accepted', 'preparing', 'ready'}.contains(o['status'])).toList(); error = null; loading = false; }); }
-    catch (e) { if (mounted) setState(() { loading = false; error = _error(e); }); }
+    if (syncing) return;
+    syncing = true;
+    if (mounted && !silent) setState(() => loading = true);
+    try {
+      final api = ref.read(transportProvider);
+      final results = await Future.wait([
+        api.get('/api/v1/merchant/branches/${branch['id']}/kitchen/tasks?limit=100'),
+        api.get('/api/v1/merchant/branches/${branch['id']}/kitchen/stations'),
+      ]);
+      if (mounted) setState(() {
+        tasks = _rows(results[0].data);
+        stations = _rows(results[1].data).where((s) => s['active'] == true).toList();
+        error = null; loading = false; lastSync = DateTime.now();
+      });
+    } catch (e) { if (mounted) setState(() { loading = false; error = _error(e); }); }
+    finally { syncing = false; }
   }
-  @override Widget build(BuildContext context) => RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(16), children: [
-    const _Header('Kitchen display', 'New · accepted · preparing · ready'),
-    const Text('Queue refreshes every 10 seconds. Timers do not auto-complete kitchen work.', style: TextStyle(fontSize: 11, color: QuickbuddyColors.muted)),
-    if (error != null) _Notice(error!, action: TextButton(onPressed: _load, child: const Text('Retry'))),
-    if (loading) const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())) else if (orders.isEmpty) const _Notice('No active kitchen tickets.') else ...orders.map((o) => _KitchenTicket(order: o, onTap: () => context.push('/orders/${o['id']}'))),
-    const QbPreviewNotice(message: 'Station assignment, recipe/allergen notes, sound alerts and pilot handover are not in the current backend contract.'),
-  ]));
-}
-
-class _KitchenTicket extends StatelessWidget {
-  const _KitchenTicket({required this.order, required this.onTap});
-  final Map<String, dynamic> order;
-  final VoidCallback onTap;
+  Future<void> _transition(Map<String, dynamic> task, String target) async {
+    try {
+      await ref.read(transportProvider).post('/api/v1/merchant/kitchen/tasks/${task['id']}/transition', data: {'target': target, 'expected_version': task['version']});
+      await _load(silent: true);
+    } catch (e) { if (mounted) _toast(context, _error(e)); }
+  }
+  Future<void> _assign(Map<String, dynamic> task, String stationId) async {
+    try {
+      await ref.read(transportProvider).put('/api/v1/merchant/kitchen/tasks/${task['id']}/station', data: {'station_id': stationId, 'expected_version': task['version']});
+      await _load(silent: true);
+    } catch (e) { if (mounted) _toast(context, _error(e)); }
+  }
+  Future<void> _addStation() async {
+    final name = TextEditingController();
+    bool packing = false;
+    final values = await showDialog<Map<String, dynamic>>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setDialog) => AlertDialog(
+      title: const Text('Add kitchen station'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: name, decoration: const InputDecoration(labelText: 'Station name')), SwitchListTile(title: const Text('Packaging station'), value: packing, onChanged: (v) => setDialog(() => packing = v))]),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')), FilledButton(onPressed: () { if (name.text.trim().length >= 2) Navigator.pop(ctx, {'name': name.text.trim(), 'is_packaging': packing}); }, child: const Text('Add'))],
+    )));
+    name.dispose();
+    if (values == null) return;
+    try {
+      await ref.read(transportProvider).post('/api/v1/merchant/branches/${selectedBranchStore.value!['id']}/kitchen/stations', data: {...values, 'max_concurrent': 5});
+      await _load(silent: true);
+    } catch (e) { if (mounted) _toast(context, _error(e)); }
+  }
   @override Widget build(BuildContext context) {
-    final items = order['items'] as List? ?? const [];
-    return Card(child: Padding(padding: const EdgeInsets.all(13), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [Expanded(child: Text('Order ${order['id']}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800))), QbStatusChip('${order['status']}'.toUpperCase(), tone: order['status'] == 'ready' ? 'success' : 'warning')]),
-      const SizedBox(height: 6),
-      ...items.map((i) => Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Text('${i['quantity']} × ${i['product_name']} · ${i['variant_name']}', style: const TextStyle(fontSize: 13)))),
+    final visible = tasks.where((t) => selectedStation == null || t['station_id'] == selectedStation).toList();
+    return RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(16), children: [
+      Row(children: [const Expanded(child: _Header('Kitchen display', 'Station tasks · prep and packaging')), IconButton(tooltip: 'Add station', onPressed: _addStation, icon: const Icon(Icons.add_business_outlined))]),
+      Row(children: [Icon(Icons.circle, size: 10, color: error == null ? Colors.green : QuickbuddyColors.red), const SizedBox(width: 6), Expanded(child: Text(error == null ? 'Connected · refreshes every 10 seconds${lastSync == null ? '' : ' · ${TimeOfDay.fromDateTime(lastSync!).format(context)}'}' : 'Disconnected · showing last loaded state', style: const TextStyle(fontSize: 11, color: QuickbuddyColors.muted))), if (error != null) TextButton(onPressed: _load, child: const Text('Retry'))]),
       const SizedBox(height: 8),
-      OutlinedButton.icon(onPressed: onTap, icon: const Icon(Icons.open_in_new), label: const Text('Open ticket')),
+      DropdownButtonFormField<String>(initialValue: selectedStation, decoration: const InputDecoration(labelText: 'Station queue'), items: [const DropdownMenuItem(value: null, child: Text('All stations')), ...stations.map((s) => DropdownMenuItem(value: s['id'] as String, child: Text('${s['name']}')))], onChanged: (v) => setState(() => selectedStation = v)),
+      if (loading) const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())) else if (visible.isEmpty) const _Notice('No kitchen tasks in this queue.') else ...visible.map(_taskCard),
+      const QbPreviewNotice(message: 'Targets use an explicitly labelled deterministic estimate until a trained preparation model is available. Timers never mark tasks or orders complete. Recipes, allergen notes and staff-specific permissions need additional backend data.'),
+    ]));
+  }
+  Widget _taskCard(Map<String, dynamic> task) {
+    final blockers = (task['blocked_by'] as List? ?? const []).length;
+    final target = DateTime.tryParse('${task['target_completed_at']}')?.toLocal();
+    final stationOptions = stations.where((s) => s['is_packaging'] == (task['task_type'] == 'packing')).toList();
+    return Card(child: Padding(padding: const EdgeInsets.all(13), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Expanded(child: Text('${task['label']}', style: const TextStyle(fontWeight: FontWeight.w800))), QbStatusChip('${task['status']}'.toString().toUpperCase(), tone: task['status'] == 'completed' ? 'success' : 'warning')]),
+      const SizedBox(height: 5),
+      Text('${task['quantity']} × · ${task['task_type'] == 'packing' ? 'Packing check' : 'Preparation'} · Order ${'${task['merchant_order_id']}'.substring(0, 8)}', style: const TextStyle(fontSize: 12)),
+      Text('Station: ${task['station_name']}  ·  ${target == null ? 'No target' : 'Target ${TimeOfDay.fromDateTime(target).format(context)}'}  ·  ${task['estimate_provenance']}', style: const TextStyle(fontSize: 11, color: QuickbuddyColors.muted)),
+      if (blockers > 0) Padding(padding: const EdgeInsets.only(top: 5), child: Text('Blocked · $blockers prerequisite task(s) remain', style: const TextStyle(fontWeight: FontWeight.w600))),
+      if (task['status'] == 'pending') DropdownButtonFormField<String>(initialValue: task['station_id'] as String, decoration: const InputDecoration(labelText: 'Assign station'), items: stationOptions.map((s) => DropdownMenuItem(value: s['id'] as String, child: Text('${s['name']}'))).toList(), onChanged: (v) { if (v != null && v != task['station_id']) _assign(task, v); }),
+      Wrap(spacing: 8, children: [
+        if (task['status'] == 'pending' || task['status'] == 'paused') OutlinedButton(onPressed: blockers > 0 ? null : () => _transition(task, 'in_progress'), child: Text(task['status'] == 'paused' ? 'Resume' : 'Start')),
+        if (task['status'] == 'in_progress') OutlinedButton(onPressed: () => _transition(task, 'paused'), child: const Text('Pause')),
+        if (task['status'] == 'in_progress') FilledButton(onPressed: () => _transition(task, 'completed'), child: const Text('Complete')),
+      ]),
     ])));
   }
 }
@@ -501,14 +551,21 @@ class InventoryScreen extends ConsumerStatefulWidget {
   @override ConsumerState<InventoryScreen> createState() => _InventoryScreenState();
 }
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
-  List<Map<String, dynamic>> stocks = [];
+  List<Map<String, dynamic>> stocks = [], batches = [];
   bool loading = true;
   String? error;
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async {
     final branch = selectedBranchStore.value;
     if (branch == null) { if (mounted) setState(() { loading = false; error = 'Select a branch first.'; }); return; }
-    try { final r = await ref.read(transportProvider).get('/api/v1/inventory/branches/${branch['id']}?limit=100'); if (mounted) setState(() { stocks = _rows(r.data); loading = false; error = null; }); }
+    try {
+      final api = ref.read(transportProvider);
+      final results = await Future.wait([
+        api.get('/api/v1/inventory/branches/${branch['id']}?limit=100'),
+        api.get('/api/v1/inventory/branches/${branch['id']}/batches?limit=100'),
+      ]);
+      if (mounted) setState(() { stocks = _rows(results[0].data); batches = _rows(results[1].data); loading = false; error = null; });
+    }
     catch (e) { if (mounted) setState(() { loading = false; error = _error(e); }); }
   }
   Future<void> _adjust(Map<String, dynamic> stock) async {
@@ -519,11 +576,30 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     try { await ref.read(transportProvider).post('/api/v1/inventory/branches/${selectedBranchStore.value!['id']}/adjustments', data: {'variant_id': stock['variant_id'], 'delta': input, 'idempotency_key': _key()}); await _load(); }
     catch (e) { if (mounted) _toast(context, _error(e)); }
   }
+  Future<void> _receiveBatch(Map<String, dynamic> stock) async {
+    final lot = TextEditingController(), quantity = TextEditingController(), expiry = TextEditingController();
+    final values = await showDialog<Map<String, String>>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Receive stock batch'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: lot, decoration: const InputDecoration(labelText: 'Lot / batch number')),
+        TextField(controller: quantity, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Received quantity')),
+        TextField(controller: expiry, decoration: const InputDecoration(labelText: 'Expiry date (YYYY-MM-DD, optional)')),
+      ]),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')), FilledButton(onPressed: () { if (lot.text.trim().isNotEmpty && quantity.text.trim().isNotEmpty) Navigator.pop(ctx, {'lot_code': lot.text.trim(), 'quantity': quantity.text.trim(), if (expiry.text.trim().isNotEmpty) 'expires_on': expiry.text.trim()}); }, child: const Text('Receive'))],
+    ));
+    lot.dispose(); quantity.dispose(); expiry.dispose();
+    if (values == null) return;
+    try {
+      await ref.read(transportProvider).post('/api/v1/inventory/branches/${selectedBranchStore.value!['id']}/batches', data: {'variant_id': stock['variant_id'], ...values, 'idempotency_key': _key()});
+      await _load();
+    } catch (e) { if (mounted) _toast(context, _error(e)); }
+  }
   @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [
-    const _Header('Inventory & availability', 'Backend stock balances · adjustments are attributed to your account'),
+    const _Header('Inventory & availability', 'Branch stock · FEFO batches · audited adjustments'),
     if (error != null) _Notice(error!, action: TextButton(onPressed: _load, child: const Text('Retry'))),
-    if (loading) const Center(child: CircularProgressIndicator()) else if (stocks.isEmpty) const _Notice('No stock balances exist for this branch.') else ...stocks.map((s) { final onHand = double.tryParse('${s['on_hand']}') ?? 0; final reserved = double.tryParse('${s['reserved']}') ?? 0; return Card(child: ListTile(title: Text('Variant ${s['variant_id']}', maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text('On hand $onHand · Reserved $reserved · Sellable ${onHand - reserved}'), trailing: IconButton(tooltip: 'Adjust stock', onPressed: () => _adjust(s), icon: const Icon(Icons.tune, color: QuickbuddyColors.orange)))); }),
-    const QbPreviewNotice(message: 'Stock movement history is available separately. This screen does not invent ingredient/BOM quantities, product names, expiry lots or low-stock thresholds.'),
+    if (loading) const Center(child: CircularProgressIndicator()) else if (stocks.isEmpty) const _Notice('No stock balances exist for this branch.') else ...stocks.map((s) { final onHand = double.tryParse('${s['on_hand']}') ?? 0; final reserved = double.tryParse('${s['reserved']}') ?? 0; return Card(child: ListTile(title: Text('Variant ${s['variant_id']}', maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text('On hand $onHand · Reserved $reserved · Sellable ${onHand - reserved}'), trailing: Wrap(children: [IconButton(tooltip: 'Receive lot', onPressed: () => _receiveBatch(s), icon: const Icon(Icons.add_box_outlined, color: QuickbuddyColors.green)), IconButton(tooltip: 'Adjust stock', onPressed: () => _adjust(s), icon: const Icon(Icons.tune, color: QuickbuddyColors.orange))]))); }),
+    if (batches.isNotEmpty) ...[const SizedBox(height: 8), const Text('Lots · FEFO order', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)), ...batches.map((b) => Card(child: ListTile(leading: const Icon(Icons.inventory_2_outlined), title: Text('${b['lot_code']} · ${b['quantity']} available'), subtitle: Text('Variant ${b['variant_id']} · Reserved ${b['reserved']} · Expiry ${b['expires_on'] ?? 'not recorded'}'))))],
+    const QbPreviewNotice(message: 'Batch stock and expiry are visible and the shared backend allocates FEFO. Ingredient/BOM quantities, supplier procurement, cycle counts and stock movement history require separate workflows.'),
   ]);
 }
 

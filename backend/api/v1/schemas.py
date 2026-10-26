@@ -286,6 +286,16 @@ class StockOut(IdOut):
     version: int
 
 
+class StockBatchOut(IdOut):
+    branch_id: UUID
+    variant_id: UUID
+    lot_code: str
+    quantity: Decimal
+    reserved: Decimal
+    expires_on: date | None
+    received_at: datetime
+
+
 class CartItemIn(Input):
     branch_id: UUID
     variant_id: UUID
@@ -366,6 +376,55 @@ class MerchantQueueOut(ChildOut):
 class MerchantQueuePage(BaseModel):
     items: list[MerchantQueueOut]
     next_cursor: str | None = None
+
+
+class KitchenStationIn(Input):
+    name: str = Field(min_length=2, max_length=100)
+    is_packaging: bool = False
+    max_concurrent: int = Field(default=5, ge=1, le=100)
+
+
+class KitchenStationOut(Output):
+    id: UUID
+    version: int
+    branch_id: UUID
+    name: str
+    is_packaging: bool
+    max_concurrent: int
+    active: bool
+
+
+class KitchenTaskOut(VersionOut):
+    merchant_order_id: UUID
+    order_item_id: UUID | None
+    branch_id: UUID
+    station_id: UUID
+    station_name: str
+    task_key: str
+    task_type: Literal["prep", "packing"]
+    label: str
+    quantity: Decimal
+    target_completed_at: datetime | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    estimate_provenance: str
+    estimate_model_version: str
+    blocked_by: list[UUID] = Field(default_factory=list)
+
+
+class KitchenTaskPage(BaseModel):
+    items: list[KitchenTaskOut]
+    next_cursor: str | None = None
+
+
+class KitchenTaskTransitionIn(Input):
+    target: Literal["in_progress", "paused", "completed"]
+    expected_version: int = Field(ge=1)
+
+
+class KitchenTaskStationIn(Input):
+    station_id: UUID
+    expected_version: int = Field(ge=1)
 
 
 class MerchantCatalogOut(BaseModel):
@@ -482,6 +541,32 @@ class LocationIn(Input):
 
 class PilotAvailabilityIn(Input):
     state: Literal["online_available", "on_break", "unavailable", "offline"]
+
+
+class PilotIncidentIn(Input):
+    category: Literal[
+        "vehicle_breakdown",
+        "road_blockage",
+        "accident",
+        "unsafe_pickup_area",
+        "unsafe_delivery_area",
+        "customer_unavailable",
+        "merchant_closed",
+        "package_damaged",
+        "wrong_package",
+        "medical_emergency",
+        "severe_weather",
+        "navigation_failure",
+        "low_battery",
+        "other",
+    ]
+    summary: str = Field(min_length=10, max_length=1000)
+    delivery_task_id: UUID | None = None
+    safety_emergency: bool = False
+
+
+class PilotIncidentResolveIn(Input):
+    resolution_summary: str = Field(min_length=10, max_length=1000)
 
 
 class LocationConsentIn(Input):

@@ -1,16 +1,4 @@
-import { Shell } from "@quickbuddy/web-design-system";
+import { redirect } from "next/navigation";
 export default function Page() {
-  return (
-    <Shell
-      title="Every conversation matters"
-      eyebrow="Support console"
-      modules={[
-        "Tickets",
-        "Order assistance",
-        "Refund approvals",
-        "Complaints",
-        "Escalations",
-      ]}
-    />
-  );
+  redirect("/workspace");
 }

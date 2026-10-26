@@ -83,7 +83,10 @@ GUARDS = [
     DECLARE branch_org uuid; branch_city uuid; role_name text;
     BEGIN
       SELECT name INTO role_name FROM identity.roles WHERE id=NEW.role_id;
-      IF NEW.organization_id IS NULL AND role_name NOT IN ('customer','delivery_pilot','platform_super_admin') THEN
+      IF NEW.organization_id IS NULL AND role_name NOT IN
+         ('customer','delivery_pilot','platform_super_admin','support_agent')
+         AND NOT (role_name IN ('city_manager','city_operator')
+                  AND NEW.city_id IS NOT NULL AND NEW.branch_id IS NULL) THEN
         RAISE EXCEPTION 'Role requires organization scope' USING ERRCODE='23514';
       END IF;
       IF NEW.branch_id IS NOT NULL THEN
