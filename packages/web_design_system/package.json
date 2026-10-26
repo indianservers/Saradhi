@@ -1,0 +1,21 @@
+{
+  "name": "@quickbuddy/web-design-system",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.tsx",
+    "./styles.css": "./src/styles.css",
+    "./auth": "./src/auth.ts"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "@quickbuddy/sdk": "0.1.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "next": "^16.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

@@ -1,0 +1,8 @@
+-- Design/reference only. Translate into a reviewed future Alembic revision after
+-- an authorized compatible PostGIS installation. DO NOT execute against unrelated clusters.
+-- CREATE EXTENSION postgis;
+-- ALTER TABLE geo.delivery_service_areas ADD COLUMN boundary geometry(MultiPolygon,4326);
+-- ALTER TABLE geo.delivery_service_areas ADD CONSTRAINT valid_service_polygon
+--   CHECK (boundary IS NULL OR (ST_IsValid(boundary) AND NOT ST_IsEmpty(boundary)));
+-- CREATE INDEX ix_service_area_boundary ON geo.delivery_service_areas USING gist(boundary);
+-- Backfill/validate real approved service polygons before setting spatial_ready.

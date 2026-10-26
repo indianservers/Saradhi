@@ -1,0 +1,26 @@
+{
+  "name": "quickbuddy",
+  "private": true,
+  "workspaces": [
+    "apps/company_admin",
+    "apps/city_operations",
+    "apps/support_console",
+    "packages/typescript_sdk",
+    "packages/web_design_system"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "contracts": "openapi-typescript packages/api_contracts/openapi.json -o packages/typescript_sdk/src/schema.d.ts && prettier --write packages/typescript_sdk/src/schema.d.ts",
+    "format": "prettier --write \"apps/*/app/**/*.{ts,tsx}\" \"packages/*/src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"apps/*/app/**/*.{ts,tsx}\" \"packages/*/src/**/*.{ts,tsx,css}\""
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "openapi-typescript": "7.13.0",
+    "prettier": "^3.6.2"
+  }
+}

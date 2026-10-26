@@ -1,0 +1,15 @@
+{
+  "database": "quickbuddy_test",
+  "transport": "in-process ASGI with real PostgreSQL",
+  "concurrent_requests": 100,
+  "independent_authenticated_sessions": 100,
+  "placed_orders": 100,
+  "statuses": {
+    "201": 100
+  },
+  "elapsed_seconds": 2.824,
+  "confirmation_requests_per_second": 35.41,
+  "scope": "100 customers, one branch, one shared stock row; no provider, network, GPS or delivery throughput claim",
+  "pool_size": 5,
+  "max_overflow": 10
+}

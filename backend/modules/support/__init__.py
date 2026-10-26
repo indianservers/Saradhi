@@ -1,0 +1,1 @@
+"""Support bounded context. See docs/architecture/module-boundaries.md."""

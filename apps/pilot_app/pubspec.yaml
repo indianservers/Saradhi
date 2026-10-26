@@ -1,0 +1,23 @@
+name: pilot_app
+description: Quickbuddy pilot app application.
+version: 0.1.0+1
+publish_to: none
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_core:
+    path: ../../packages/flutter_core
+  flutter_design_system:
+    path: ../../packages/flutter_design_system
+  flutter_networking:
+    path: ../../packages/flutter_networking
+  go_router: ^17.0.0
+  dio: ^5.8.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true

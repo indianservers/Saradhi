@@ -1,0 +1,18 @@
+{
+  "name": "@quickbuddy/company_admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build --webpack",
+    "start": "next start --port 3000",
+    "typecheck": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "@quickbuddy/sdk": "0.1.0",
+    "@quickbuddy/web-design-system": "0.1.0"
+  }
+}

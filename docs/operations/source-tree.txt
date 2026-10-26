@@ -1,0 +1,268 @@
+Quickbuddy/
+|-- .github/
+|   `-- workflows/
+|       `-- ci.yml
+|-- ai_platform/
+|   |-- agents/
+|   |-- evaluations/
+|   |-- features/
+|   |-- gateway/
+|   |-- models/
+|   |-- prompts/
+|   `-- README.md
+|-- apps/
+|   |-- city_operations/
+|   |   |-- app/
+|   |   |   |-- (protected)/
+|   |   |   |   `-- workspace/
+|   |   |   |       |-- layout.tsx
+|   |   |   |       `-- page.tsx
+|   |   |   |-- login/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- layout.tsx
+|   |   |   `-- page.tsx
+|   |   |-- .env.local.example
+|   |   |-- README.md
+|   |   |-- next-env.d.ts
+|   |   |-- next.config.ts
+|   |   |-- package.json
+|   |   `-- tsconfig.json
+|   |-- company_admin/
+|   |   |-- app/
+|   |   |   |-- (protected)/
+|   |   |   |   `-- workspace/
+|   |   |   |       |-- layout.tsx
+|   |   |   |       `-- page.tsx
+|   |   |   |-- login/
+|   |   |   |   `-- page.tsx
+|   |   |   |-- layout.tsx
+|   |   |   `-- page.tsx
+|   |   |-- .env.local.example
+|   |   |-- README.md
+|   |   |-- next-env.d.ts
+|   |   |-- next.config.ts
+|   |   |-- package.json
+|   |   `-- tsconfig.json
+|   |-- customer_app/
+|   |   |-- lib/
+|   |   |   `-- main.dart
+|   |   |-- test/
+|   |   |   `-- widget_test.dart
+|   |   |-- README.md
+|   |   |-- analysis_options.yaml
+|   |   `-- pubspec.yaml
+|   |-- merchant_app/
+|   |   |-- lib/
+|   |   |   `-- main.dart
+|   |   |-- test/
+|   |   |   `-- widget_test.dart
+|   |   |-- README.md
+|   |   |-- analysis_options.yaml
+|   |   `-- pubspec.yaml
+|   |-- pilot_app/
+|   |   |-- lib/
+|   |   |   `-- main.dart
+|   |   |-- test/
+|   |   |   `-- widget_test.dart
+|   |   |-- README.md
+|   |   |-- analysis_options.yaml
+|   |   `-- pubspec.yaml
+|   `-- support_console/
+|       |-- app/
+|       |   |-- (protected)/
+|       |   |   `-- workspace/
+|       |   |       |-- layout.tsx
+|       |   |       `-- page.tsx
+|       |   |-- login/
+|       |   |   `-- page.tsx
+|       |   |-- layout.tsx
+|       |   `-- page.tsx
+|       |-- .env.local.example
+|       |-- README.md
+|       |-- next-env.d.ts
+|       |-- next.config.ts
+|       |-- package.json
+|       `-- tsconfig.json
+|-- backend/
+|   |-- api/
+|   |   |-- app/
+|   |   |   |-- __init__.py
+|   |   |   `-- main.py
+|   |   `-- __init__.py
+|   |-- integrations/
+|   |   `-- README.md
+|   |-- migrations/
+|   |   |-- versions/
+|   |   |-- env.py
+|   |   `-- script.py.mako
+|   |-- modules/
+|   |   |-- ai/
+|   |   |   `-- __init__.py
+|   |   |-- analytics/
+|   |   |   `-- __init__.py
+|   |   |-- audit/
+|   |   |   `-- __init__.py
+|   |   |-- carts/
+|   |   |   `-- __init__.py
+|   |   |-- catalog/
+|   |   |   `-- __init__.py
+|   |   |-- compliance/
+|   |   |   `-- __init__.py
+|   |   |-- customers/
+|   |   |   `-- __init__.py
+|   |   |-- dispatch/
+|   |   |   `-- __init__.py
+|   |   |-- fulfillment/
+|   |   |   `-- __init__.py
+|   |   |-- geography/
+|   |   |   `-- __init__.py
+|   |   |-- identity/
+|   |   |   `-- __init__.py
+|   |   |-- inventory/
+|   |   |   `-- __init__.py
+|   |   |-- ledger/
+|   |   |   `-- __init__.py
+|   |   |-- merchants/
+|   |   |   `-- __init__.py
+|   |   |-- notifications/
+|   |   |   `-- __init__.py
+|   |   |-- orders/
+|   |   |   `-- __init__.py
+|   |   |-- organizations/
+|   |   |   `-- __init__.py
+|   |   |-- payments/
+|   |   |   `-- __init__.py
+|   |   |-- promotions/
+|   |   |   `-- __init__.py
+|   |   |-- reviews/
+|   |   |   `-- __init__.py
+|   |   |-- scheduling/
+|   |   |   `-- __init__.py
+|   |   |-- settlements/
+|   |   |   `-- __init__.py
+|   |   |-- subscriptions/
+|   |   |   `-- __init__.py
+|   |   |-- support/
+|   |   |   `-- __init__.py
+|   |   |-- tracking/
+|   |   |   `-- __init__.py
+|   |   `-- __init__.py
+|   |-- scripts/
+|   |   |-- check_database.py
+|   |   |-- export_openapi.py
+|   |   `-- worker_smoke.py
+|   |-- shared/
+|   |   |-- __init__.py
+|   |   |-- auth.py
+|   |   |-- contracts.py
+|   |   |-- database.py
+|   |   |-- logging.py
+|   |   |-- ports.py
+|   |   `-- settings.py
+|   |-- tests/
+|   |   |-- test_auth.py
+|   |   |-- test_foundation.py
+|   |   `-- test_resources.py
+|   |-- workers/
+|   |   |-- __init__.py
+|   |   `-- main.py
+|   `-- __init__.py
+|-- database/
+|   |-- backups/
+|   |-- design/
+|   |-- migrations/
+|   |   `-- README.md
+|   |-- scripts/
+|   |   `-- README.md
+|   `-- seeds/
+|-- docs/
+|   |-- api/
+|   |-- architecture/
+|   |   |-- ai-platform-design.md
+|   |   |-- module-boundaries.md
+|   |   |-- multi-city-design.md
+|   |   |-- order-lifecycle-concepts.md
+|   |   |-- scaling-strategy.md
+|   |   `-- system-overview.md
+|   |-- database/
+|   |   `-- schema-design-principles.md
+|   |-- decisions/
+|   |   `-- 0001-foundation.md
+|   |-- deployment/
+|   |   |-- cloud-portability.md
+|   |   `-- local-development.md
+|   |-- operations/
+|   |   |-- phase-1-validation.md
+|   |   `-- source-tree.txt
+|   `-- security/
+|       `-- security-architecture.md
+|-- infrastructure/
+|   |-- aws/
+|   |-- ci_cd/
+|   |-- digitalocean/
+|   |-- docker/
+|   |   `-- backend.Dockerfile
+|   |-- kubernetes/
+|   |-- local/
+|   |-- observability/
+|   |-- terraform/
+|   `-- README.md
+|-- packages/
+|   |-- api_contracts/
+|   |   |-- README.md
+|   |   `-- openapi.json
+|   |-- flutter_core/
+|   |   |-- lib/
+|   |   |   `-- flutter_core.dart
+|   |   `-- pubspec.yaml
+|   |-- flutter_design_system/
+|   |   |-- lib/
+|   |   |   `-- flutter_design_system.dart
+|   |   `-- pubspec.yaml
+|   |-- flutter_networking/
+|   |   |-- lib/
+|   |   |   `-- flutter_networking.dart
+|   |   `-- pubspec.yaml
+|   |-- shared_assets/
+|   |-- typescript_sdk/
+|   |   |-- src/
+|   |   |   |-- index.ts
+|   |   |   `-- schema.d.ts
+|   |   |-- package.json
+|   |   `-- tsconfig.json
+|   `-- web_design_system/
+|       |-- src/
+|       |   |-- auth.ts
+|       |   |-- index.tsx
+|       |   `-- styles.css
+|       |-- package.json
+|       `-- tsconfig.json
+|-- tests/
+|   |-- contract/
+|   |   `-- test_contract.py
+|   |-- end_to_end/
+|   |-- integration/
+|   `-- performance/
+|-- tools/
+|   |-- generators/
+|   |-- load_testing/
+|   |   `-- health.js
+|   |-- validation/
+|   |   |-- live_smoke.py
+|   |   |-- source_safety.py
+|   |   |-- source_tree.py
+|   |   `-- structure.py
+|   `-- dev.ps1
+|-- .dockerignore
+|-- .env.example
+|-- .gitignore
+|-- DEVELOPMENT.md
+|-- Makefile
+|-- README.md
+|-- alembic.ini
+|-- docker-compose.yml
+|-- package-lock.json
+|-- package.json
+|-- pyproject.toml
+|-- requirements.lock
+`-- tsconfig.base.json
