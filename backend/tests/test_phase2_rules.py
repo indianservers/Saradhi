@@ -62,7 +62,7 @@ def test_opaque_cursor_rejects_arbitrary_input():
 
 def test_full_metadata_has_real_relationships_and_no_float_money():
     assert len(metadata.tables) >= 240
-    assert len({table.schema for table in metadata.tables.values()}) == 13
+    assert len({table.schema for table in metadata.tables.values()}) == 14
     for table in metadata.tables.values():
         for column in table.columns:
             assert str(column.type) not in {"FLOAT", "DOUBLE PRECISION", "MONEY"}

@@ -82,6 +82,25 @@ class RefreshToken(Record, Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class CustomerConsentEvent(Record, Base):
+    __tablename__ = "customer_consent_events"
+    __table_args__ = (
+        CheckConstraint(
+            "purpose IN ('marketing') AND channel IN ('push','email','sms','whatsapp')",
+            name="consent_scope",
+        ),
+        Index("ix_customer_consent_latest", "user_id", "purpose", "channel", "created_at"),
+        {"schema": "engagement"},
+    )
+    user_id: Mapped[UUID] = fk("identity.users.id", index=True)
+    purpose: Mapped[str] = mapped_column(Text)
+    channel: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean)
+    policy_version: Mapped[str] = mapped_column(String(80))
+    source: Mapped[str] = mapped_column(Text)
+    idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
+
+
 class Organization(Record, Base):
     __tablename__ = "organizations"
     __table_args__ = {"schema": "identity"}
@@ -865,3 +884,54 @@ class RateBucket(Record, Base):
     bucket_key: Mapped[str] = mapped_column(Text)
     window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     attempts: Mapped[int] = mapped_column(Integer)
+
+
+class BulkJob(Record, Base):
+    __tablename__ = "bulk_data_jobs"
+    __table_args__ = (
+        UniqueConstraint("actor_id", "idempotency_key"),
+        CheckConstraint(
+            "status IN ('VALIDATED','PROCESSING','COMPLETED',"
+            "'PARTIALLY_COMPLETED','FAILED','CANCELLED')",
+            name="bulk_job_status",
+        ),
+        {"schema": "admin"},
+    )
+    actor_id: Mapped[UUID] = fk("identity.users.id", index=True)
+    kind: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, default="VALIDATED")
+    idempotency_key: Mapped[str] = mapped_column(String(128))
+    source_hash: Mapped[str] = mapped_column(String(64))
+    row_count: Mapped[int] = mapped_column(Integer, default=0)
+    valid_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_count: Mapped[int] = mapped_column(Integer, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0)
+    previewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mapping: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+
+class BulkJobRow(Record, Base):
+    __tablename__ = "bulk_data_job_rows"
+    __table_args__ = (
+        UniqueConstraint("job_id", "row_number"),
+        {"schema": "admin"},
+    )
+    job_id: Mapped[UUID] = fk("admin.bulk_data_jobs.id", index=True)
+    row_number: Mapped[int] = mapped_column(Integer)
+    source_key: Mapped[str] = mapped_column(Text)
+    raw_payload: Mapped[dict] = mapped_column(JSONB)
+    payload: Mapped[dict] = mapped_column(JSONB)
+    errors: Mapped[list] = mapped_column(JSONB, default=list)
+    status: Mapped[str] = mapped_column(Text, default="valid")
+    record_id: Mapped[UUID | None] = mapped_column()
+
+
+class BulkExternalRef(Record, Base):
+    __tablename__ = "bulk_external_refs"
+    __table_args__ = (
+        UniqueConstraint("entity", "source_key"),
+        {"schema": "admin"},
+    )
+    entity: Mapped[str] = mapped_column(Text)
+    source_key: Mapped[str] = mapped_column(Text)
+    record_id: Mapped[UUID] = mapped_column()

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 const uuid = "[0-9a-fA-F-]{36}";
 const readRoutes = [
   /^api\/v1\/me$/,
+  /^api\/v1\/me\/consents$/,
   /^api\/v1\/geo\/cities$/,
   /^api\/v1\/operations\/authorized-cities$/,
   /^api\/v1\/merchants\/branches$/,
@@ -10,6 +11,15 @@ const readRoutes = [
   /^api\/v1\/ai\/copilot\/status$/,
   /^api\/v1\/finance\/authorized-organizations$/,
   /^api\/v1\/finance\/refund-approvals$/,
+  /^api\/v1\/bulk\/jobs$/,
+  /^api\/v1\/bulk\/templates\/branches$/,
+  /^api\/v1\/admin\/customers$/,
+  /^api\/v1\/admin\/customers-export$/,
+  new RegExp(
+    `^api/v1/admin/customers/${uuid}(/(orders|payments|addresses|subscriptions|loyalty|referrals|campaigns|support|feedback|privacy|security))?$`,
+  ),
+  new RegExp(`^api/v1/bulk/imports/${uuid}$`),
+  new RegExp(`^api/v1/bulk/imports/${uuid}/errors$`),
   /^api\/v1\/support\/tickets$/,
   new RegExp(`^api/v1/support/tickets/${uuid}/messages$`),
   new RegExp(
@@ -17,6 +27,12 @@ const readRoutes = [
   ),
 ];
 const writeRoutes = [
+  /^api\/v1\/me\/consents$/,
+  /^api\/v1\/admin\/customer-segments\/preview$/,
+  /^api\/v1\/bulk\/imports$/,
+  /^api\/v1\/bulk\/exports$/,
+  new RegExp(`^api/v1/bulk/imports/${uuid}/(mapping|validate|dry-run|commit)$`),
+  new RegExp(`^api/v1/bulk/jobs/${uuid}/cancel$`),
   new RegExp(`^api/v1/finance/refund-approvals/${uuid}/decision$`),
   new RegExp(
     `^api/v1/operations/pilot-incidents/${uuid}/(acknowledge|resolve)$`,
@@ -66,22 +82,31 @@ export async function backendProxy(request: Request, path: string[]) {
     accept: "application/json",
     authorization: `Bearer ${token}`,
   });
+  for (const header of ["idempotency-key", "x-bulk-entity"]) {
+    const value = request.headers.get(header);
+    if (value) headers.set(header, value);
+  }
   let body: string | undefined;
   if (method !== "GET") {
     const length = Number(request.headers.get("content-length") ?? "0");
-    if (length > 16_384)
+    const contentType =
+      request.headers.get("content-type")?.toLowerCase() ?? "";
+    const isCsv =
+      route === "api/v1/bulk/imports" && contentType.startsWith("text/csv");
+    if (!isCsv && !contentType.startsWith("application/json"))
+      return responseError(
+        "JSON or supported CSV content type is required.",
+        415,
+      );
+    const maxBytes = isCsv ? 5 * 1024 * 1024 : 16_384;
+    if (length > maxBytes)
       return responseError("Request body is too large.", 413);
-    if (
-      !request.headers
-        .get("content-type")
-        ?.toLowerCase()
-        .startsWith("application/json")
-    ) {
-      return responseError("JSON content type is required.", 415);
-    }
-    headers.set("content-type", "application/json");
+    headers.set(
+      "content-type",
+      isCsv ? "text/csv; charset=utf-8" : "application/json",
+    );
     body = await request.text();
-    if (new TextEncoder().encode(body).byteLength > 16_384)
+    if (new TextEncoder().encode(body).byteLength > maxBytes)
       return responseError("Request body is too large.", 413);
   }
   try {
@@ -152,6 +177,13 @@ export async function backendProxy(request: Request, path: string[]) {
         "content-type":
           response.headers.get("content-type") ?? "application/json",
         "cache-control": "no-store",
+        ...(response.headers.get("content-disposition")
+          ? {
+              "content-disposition": response.headers.get(
+                "content-disposition",
+              )!,
+            }
+          : {}),
       },
     });
   } catch {

@@ -1,6 +1,6 @@
 {
   "scope": "local ASGI + PostgreSQL, one task/two pilot candidates",
-  "api_latency_ms": 45.56,
+  "api_latency_ms": 88.09,
   "algorithm_runtime_ms": 0,
   "plan_size": 1,
   "committed": false,

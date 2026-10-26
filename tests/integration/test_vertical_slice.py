@@ -1404,7 +1404,7 @@ async def test_pagination_validation_and_fresh_migration(api):
     invalid_cursor = await client.get("/api/v1/orders?cursor=invalid", headers=identity["headers"])
     assert invalid_cursor.status_code == 422
     async with app.state.sessions() as db:
-        assert await db.scalar(text("SELECT version_num FROM alembic_version")) == "20261027_0017"
+        assert await db.scalar(text("SELECT version_num FROM alembic_version")) == "20261027_0020"
         count = await db.scalar(
             text(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema IN "

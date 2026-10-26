@@ -1,0 +1,9 @@
+# Bulk import architecture (current scope)
+
+`backend/modules/bulk_data` is the shared bounded parser/mapping layer. Current supported entity is **branches only**. Upload is raw UTF-8 CSV at `POST /api/v1/bulk/imports`, with `X-Bulk-Entity: branches` and an idempotency key. Limits: 5 MiB, 20 columns, 5,000 nonblank rows, 2,000 characters/cell. Unknown headers are rejected so arbitrary personal data is not persisted. XLSX/macros are not accepted.
+
+Workflow: upload and row validation → optional six-field column mapping → dry-run preview (first 100 rows; total counts) → explicit commit. Rows require a stable external reference, existing brand/city, branch name and geographic coordinates. Database-backed `merchant.write` scope is checked for each row. Duplicate source references are rejected globally; name similarity is only a warning and never a match. Commit rechecks the scope and inserts each stable reference under a uniqueness constraint. Existing branch create domain constraints are reused.
+
+A committed branch is `pending`, with `accepting_orders=false`; imported records are never auto-approved. The transaction is synchronous and capped at 200 eligible rows. DB rows preserve the allowlisted source fields for audit/recovery, with actor ownership. Committed branch changes and job transitions create audit events. Jobs are not currently encrypted at application level; use database encryption/access controls and a retention policy before storing larger or personal datasets.
+
+Not implemented: ARQ import workers, durable chunk checkpoints/retries, XLSX parser, template registry, branch update/upsert, KYC/customer/pilot onboarding, catalogue/price/stock engine integration, maker-checker approvals, job retention/deletion, or S3 private staging. Do not widen accepted entities until each domain service and authorization/test matrix is implemented.

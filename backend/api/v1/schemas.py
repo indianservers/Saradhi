@@ -15,6 +15,38 @@ class Input(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+class BulkMappingIn(Input):
+    mapping: dict[str, str] = Field(min_length=1, max_length=20)
+
+
+class BulkExportIn(Input):
+    entity: Literal["branches"]
+    city_id: UUID
+    limit: int = Field(default=500, ge=1, le=500)
+
+
+class CustomerConsentIn(Input):
+    purpose: Literal["marketing"] = "marketing"
+    channel: Literal["push", "email", "sms", "whatsapp"]
+    enabled: bool
+    policy_version: str = Field(min_length=1, max_length=80)
+
+
+class CustomerSegmentConditionIn(Input):
+    field: Literal[
+        "status", "order_count", "gross_purchase_value", "last_order_days", "marketing_consent"
+    ]
+    op: Literal["eq", "gte", "lte"]
+    value: str | int | float | bool
+    channel: Literal["push", "email", "sms", "whatsapp"] | None = None
+
+
+class CustomerSegmentPreviewIn(Input):
+    city_id: UUID
+    logic: Literal["and", "or"] = "and"
+    conditions: list[CustomerSegmentConditionIn] = Field(min_length=1, max_length=10)
+
+
 class Output(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

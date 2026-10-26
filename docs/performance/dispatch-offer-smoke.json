@@ -1,6 +1,6 @@
 {
   "scope": "local ASGI API + PostgreSQL, two concurrent pilot offer requests",
   "concurrent_requests": 2,
-  "winner_and_conflict_latency_ms": 71.85,
+  "winner_and_conflict_latency_ms": 100.96,
   "limitations": "single task, two candidates, local test harness; not fleet-scale latency"
 }

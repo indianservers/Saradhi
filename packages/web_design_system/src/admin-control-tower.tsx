@@ -10,6 +10,8 @@ import {
   ChevronDown,
   CircleHelp,
   DollarSign,
+  Database,
+  Download,
   Clock3,
   Command,
   FileText,
@@ -19,6 +21,8 @@ import {
   ShieldCheck,
   Sparkles,
   Store,
+  Upload,
+  Users,
 } from "lucide-react";
 
 type City = { id: string; name: string };
@@ -68,6 +72,31 @@ type Model = {
   status: string;
   validation_passed: boolean;
   metrics: Record<string, unknown>;
+};
+type BulkJob = {
+  id: string;
+  entity: string;
+  status: string;
+  row_count: number;
+  valid_count: number;
+  created_count: number;
+  failed_count: number;
+  previewed: boolean;
+  created_at: string;
+};
+type CustomerRow = {
+  id: string;
+  name: string;
+  status: string;
+  email: string | null;
+  email_verified: boolean;
+  phone: string | null;
+  phone_verified: boolean;
+  created_at: string;
+  order_count: number;
+  completed_order_count: number;
+  gross_purchase_value: string;
+  last_order_at: string | null;
 };
 type Result<T> = {
   data: T | null;
@@ -205,6 +234,9 @@ export function AdminControlTower() {
       ? `api/v1/finance/refund-approvals?organization_id=${organizationId}&limit=100`
       : null,
   );
+  const bulkJobs = useLive<{ items: BulkJob[] }>(
+    screen === "data" ? "api/v1/bulk/jobs?limit=50" : null,
+  );
   const selected = cities.data?.items.find((city) => city.id === cityId);
   const items = dispatch.data?.counts ?? {};
   const activeTasks = Object.values(items).reduce(
@@ -219,6 +251,8 @@ export function AdminControlTower() {
     ["incidents", "Incidents", AlertTriangle],
     ["ai", "AI operations", Sparkles],
     ["finance", "Refund approvals", DollarSign],
+    ["customers", "Customers", Users],
+    ["data", "Data operations", Database],
   ] as const;
   const health = [dispatch, fleet, incidents].some((x) => x.error)
     ? "Limited"
@@ -235,6 +269,7 @@ export function AdminControlTower() {
       models,
       organizations,
       refunds,
+      bulkJobs,
     ].forEach((resource) => resource.reload());
   async function signOut() {
     await fetch("/api/session", { method: "DELETE" });
@@ -663,6 +698,10 @@ export function AdminControlTower() {
             </section>
           )}
           {screen === "finance" && <RefundApprovalQueue resource={refunds} />}
+          {screen === "data" && (
+            <BulkImportCenter cityId={cityId} jobs={bulkJobs} />
+          )}
+          {screen === "customers" && <CustomerDirectory cityId={cityId} />}
           <footer className="qb-footer">
             <span>QUICKBUDDY PLATFORM</span>
             <span>
@@ -806,6 +845,516 @@ function RefundApprovalQueue({
         )
       )}
     </section>
+  );
+}
+
+const branchImportFields = [
+  "external_ref",
+  "brand_id",
+  "city_id",
+  "branch_name",
+  "latitude",
+  "longitude",
+] as const;
+
+function csvHeaderCells(line: string) {
+  const cells: string[] = [];
+  let value = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"' && quoted && line[i + 1] === '"') {
+      value += '"';
+      i += 1;
+    } else if (char === '"') quoted = !quoted;
+    else if (char === "," && !quoted) {
+      cells.push(value.trim());
+      value = "";
+    } else value += char;
+  }
+  cells.push(value.trim());
+  return cells.map((cell) => cell.replace(/^\uFEFF/, ""));
+}
+
+function BulkImportCenter({
+  cityId,
+  jobs,
+}: {
+  cityId: string;
+  jobs: Result<{ items: BulkJob[] }>;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [job, setJob] = useState<BulkJob | null>(null);
+  const [preview, setPreview] = useState<{
+    rows: {
+      row_number: number;
+      status: string;
+      branch_name: string;
+      external_ref: string;
+      issues: { field: string; code: string }[];
+    }[];
+  } | null>(null);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function call(
+    path: string,
+    body?: unknown,
+    headersIn?: HeadersInit,
+    methodOverride?: "GET" | "POST",
+  ) {
+    const response = await fetch(`/api/backend/api/v1/${path}`, {
+      method: methodOverride ?? (body === undefined ? "GET" : "POST"),
+      headers:
+        body === undefined
+          ? headersIn
+          : {
+              "content-type": "application/json",
+              ...Object.fromEntries(new Headers(headersIn)),
+            },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: "no-store",
+    });
+    const data = response.headers.get("content-type")?.includes("json")
+      ? await response.json().catch(() => ({}))
+      : await response.text();
+    if (!response.ok) {
+      const detail =
+        typeof data === "object" && data && "detail" in data
+          ? String(data.detail)
+          : `Request failed (${response.status})`;
+      throw new Error(detail);
+    }
+    return data as Record<string, unknown>;
+  }
+
+  async function showPreview(currentJob: BulkJob) {
+    const result = (await call(
+      `bulk/imports/${currentJob.id}/dry-run`,
+      undefined,
+      undefined,
+      "POST",
+    )) as unknown as {
+      rows: NonNullable<typeof preview>["rows"];
+    } & BulkJob;
+    setJob(result);
+    setPreview(result);
+    jobs.reload();
+  }
+
+  async function upload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!file) return;
+    setBusy("upload");
+    setError("");
+    setNotice("");
+    setPreview(null);
+    try {
+      if (
+        !file.name.toLowerCase().endsWith(".csv") ||
+        file.size > 5 * 1024 * 1024
+      )
+        throw new Error("Choose a CSV file no larger than 5 MiB.");
+      let source: string;
+      try {
+        source = new TextDecoder("utf-8", { fatal: true }).decode(
+          await file.arrayBuffer(),
+        );
+      } catch {
+        throw new Error("CSV must be valid UTF-8 text.");
+      }
+      const firstLine = source.split(/\r?\n/, 1)[0];
+      const fields = csvHeaderCells(firstLine);
+      if (fields.length > 20 || fields.some((field) => !field))
+        throw new Error("CSV must have at most 20 non-empty column headers.");
+      setHeaders(fields);
+      const initialMap = Object.fromEntries(
+        branchImportFields.map((field) => [
+          field,
+          fields.find(
+            (header) =>
+              header
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_")
+                .replace(/^_|_$/g, "") === field,
+          ) ?? "",
+        ]),
+      );
+      setMapping(initialMap);
+      const response = await fetch("/api/backend/api/v1/bulk/imports", {
+        method: "POST",
+        headers: {
+          "content-type": "text/csv; charset=utf-8",
+          "x-bulk-entity": "branches",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: source,
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(result.detail ?? `Upload failed (${response.status})`);
+      const createdJob = result as BulkJob;
+      setJob(createdJob);
+      const exactTemplate = branchImportFields.every(
+        (field) => initialMap[field],
+      );
+      if (exactTemplate) await showPreview(createdJob);
+      else
+        setNotice(
+          "Map each required field to a CSV column, then preview the changes.",
+        );
+      jobs.reload();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "CSV upload failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function mapAndPreview() {
+    if (!job) return;
+    setBusy("mapping");
+    setError("");
+    try {
+      await call(`bulk/imports/${job.id}/mapping`, { mapping });
+      await showPreview(job);
+      setNotice(
+        "Preview only: successful rows create pending branches. They remain closed until separately approved.",
+      );
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Mapping failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function commitImport() {
+    if (!job) return;
+    setBusy("commit");
+    setError("");
+    try {
+      const result = (await call(
+        `bulk/imports/${job.id}/commit`,
+      )) as unknown as BulkJob;
+      setJob(result);
+      setNotice(
+        `${result.created_count} pending branches created; ${result.failed_count} rows failed.`,
+      );
+      jobs.reload();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Commit failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function cancelImport() {
+    if (!job) return;
+    setBusy("cancel");
+    setError("");
+    try {
+      const result = (await call(
+        `bulk/jobs/${job.id}/cancel`,
+        {},
+      )) as unknown as BulkJob;
+      setJob(result);
+      setPreview(null);
+      setNotice("The uncommitted import job was cancelled.");
+      jobs.reload();
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Cancellation failed.",
+      );
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function exportBranches() {
+    if (!cityId) return;
+    setBusy("export");
+    setError("");
+    try {
+      const response = await fetch("/api/backend/api/v1/bulk/exports", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          entity: "branches",
+          city_id: cityId,
+          limit: 500,
+        }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.detail ?? `Export failed (${response.status})`);
+      }
+      const objectUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download =
+        response.headers
+          .get("content-disposition")
+          ?.match(/filename="([^"]+)"/)?.[1] ?? "quickbuddy-branches.csv";
+      link.click();
+      URL.revokeObjectURL(objectUrl);
+      setNotice(
+        "Authorized branch export downloaded. The backend recorded the export audit event.",
+      );
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Export failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <div className="qb-bulk-layout">
+      <section className="qb-panel qb-bulk-panel">
+        <div className="qb-panel-head">
+          <div>
+            <h2>Branch onboarding import</h2>
+            <p>
+              CSV only · 5 MiB maximum · 5,000 rows maximum · imports create
+              pending branches
+            </p>
+          </div>
+          <a
+            className="qb-outline qb-bulk-template"
+            href="/api/backend/api/v1/bulk/templates/branches"
+          >
+            <Download size={14} /> CSV template
+          </a>
+        </div>
+        <form className="qb-bulk-upload" onSubmit={upload}>
+          <label className="qb-bulk-drop">
+            <Upload size={20} />
+            <b>{file?.name ?? "Choose a branch CSV"}</b>
+            <span>
+              Stable external reference, brand and city IDs, name and
+              coordinates
+            </span>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          <button className="qb-primary" disabled={!file || Boolean(busy)}>
+            {busy === "upload" ? "Validating…" : "Upload and validate"}
+          </button>
+        </form>
+        {headers.length > 0 &&
+          job &&
+          !job.previewed &&
+          job.status !== "CANCELLED" && (
+            <div className="qb-bulk-map">
+              <h3>Map columns</h3>
+              <div className="qb-bulk-map-grid">
+                {branchImportFields.map((field) => (
+                  <label key={field}>
+                    {field.replaceAll("_", " ")}
+                    <select
+                      value={mapping[field] ?? ""}
+                      onChange={(event) =>
+                        setMapping((old) => ({
+                          ...old,
+                          [field]: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Choose column</option>
+                      {headers.map((header) => (
+                        <option key={header} value={header}>
+                          {header}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+              <button
+                className="qb-outline"
+                disabled={
+                  Boolean(busy) ||
+                  branchImportFields.some((field) => !mapping[field])
+                }
+                onClick={() => void mapAndPreview()}
+              >
+                {busy === "mapping" ? "Mapping…" : "Map columns and preview"}
+              </button>
+            </div>
+          )}
+        {error && <Notice error={error} />}
+        {notice && (
+          <div className="qb-unavailable" role="status">
+            {notice}
+          </div>
+        )}
+        {job && (
+          <div className="qb-bulk-job">
+            <div className="qb-bulk-job-heading">
+              <div>
+                <b>Import preview</b>
+                <small>Job {job.id}</small>
+              </div>
+              <span className={`qb-status-pill ${job.status.toLowerCase()}`}>
+                {job.status}
+              </span>
+            </div>
+            <div className="qb-bulk-stats">
+              <span>
+                <b>{job.row_count}</b> rows
+              </span>
+              <span>
+                <b>{job.valid_count}</b> eligible
+              </span>
+              <span>
+                <b>{job.failed_count}</b> with errors
+              </span>
+            </div>
+            {preview && (
+              <div className="qb-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Row</th>
+                      <th>Branch</th>
+                      <th>Source ref</th>
+                      <th>Result</th>
+                      <th>Issues</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.rows.map((row) => (
+                      <tr key={row.row_number}>
+                        <td>{row.row_number}</td>
+                        <td>{row.branch_name}</td>
+                        <td>{row.external_ref}</td>
+                        <td>{row.status}</td>
+                        <td>
+                          {row.issues
+                            .map((issue) => `${issue.field}: ${issue.code}`)
+                            .join("; ") || "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {job.previewed && job.status === "VALIDATED" && (
+              <div className="qb-bulk-actions">
+                <p>
+                  Commit creates branches in pending review status. No branch is
+                  auto-approved or opened for orders.
+                </p>
+                <button
+                  className="qb-primary"
+                  disabled={!job.valid_count || Boolean(busy)}
+                  onClick={() => void commitImport()}
+                >
+                  {busy === "commit"
+                    ? "Committing…"
+                    : `Commit ${job.valid_count} valid rows`}
+                </button>
+                <button
+                  className="qb-outline"
+                  disabled={Boolean(busy)}
+                  onClick={() => void cancelImport()}
+                >
+                  {busy === "cancel" ? "Cancelling…" : "Cancel import"}
+                </button>
+              </div>
+            )}
+            {!job.previewed && job.status === "VALIDATED" && (
+              <button
+                className="qb-outline"
+                disabled={Boolean(busy)}
+                onClick={() => void cancelImport()}
+              >
+                {busy === "cancel" ? "Cancelling…" : "Cancel import"}
+              </button>
+            )}
+          </div>
+        )}
+      </section>
+      <section className="qb-panel">
+        <div className="qb-panel-head">
+          <div>
+            <h2>Branch export</h2>
+            <p>
+              Authorized rows in the selected city · CSV capped at 500 rows ·
+              audited
+            </p>
+          </div>
+        </div>
+        <button
+          className="qb-outline"
+          disabled={!cityId || Boolean(busy)}
+          onClick={() => void exportBranches()}
+        >
+          <Download size={14} />{" "}
+          {busy === "export" ? "Preparing…" : "Export selected city"}
+        </button>
+        <p className="qb-bulk-privacy">
+          Customer contact, payment, KYC and settlement data are not included in
+          this export. Exports are generated on demand and are not stored as
+          public files.
+        </p>
+      </section>
+      <section className="qb-panel qb-bulk-history">
+        <div className="qb-panel-head">
+          <div>
+            <h2>Recent jobs</h2>
+            <p>Only jobs created by your current account are shown.</p>
+          </div>
+          <button className="qb-link" onClick={jobs.reload}>
+            Refresh
+          </button>
+        </div>
+        <Notice error={jobs.error} />
+        {jobs.data?.items.length ? (
+          <div className="qb-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Created</th>
+                  <th>Entity</th>
+                  <th>Status</th>
+                  <th>Rows</th>
+                  <th>Created</th>
+                  <th>Errors</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>{new Date(item.created_at).toLocaleString()}</td>
+                    <td>{item.entity}</td>
+                    <td>{item.status}</td>
+                    <td>{item.row_count}</td>
+                    <td>{item.created_count}</td>
+                    <td>{item.failed_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Empty
+            title={jobs.loading ? "Loading jobs" : "No import jobs yet"}
+            detail={
+              jobs.loading
+                ? "Fetching your private job history."
+                : "Completed and validated jobs will appear here."
+            }
+          />
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -1389,5 +1938,424 @@ export function SupportConsoleWorkspace() {
         </section>
       </main>
     </div>
+  );
+}
+
+function CustomerDirectory({ cityId }: { cityId: string }) {
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [tab, setTab] = useState("overview");
+  const [minimumOrders, setMinimumOrders] = useState("1");
+  const [dormantDays, setDormantDays] = useState("");
+  const [segmentCount, setSegmentCount] = useState<number | null>(null);
+  const [segmentError, setSegmentError] = useState("");
+  const [segmentBusy, setSegmentBusy] = useState(false);
+  const path = cityId
+    ? `api/v1/admin/customers?city_id=${cityId}&limit=50${query.trim() ? `&q=${encodeURIComponent(query.trim())}` : ""}`
+    : null;
+  const customers = useLive<{
+    items: CustomerRow[];
+    next_cursor: string | null;
+  }>(path);
+  const detail = useLive<{
+    customer: Omit<
+      CustomerRow,
+      | "order_count"
+      | "completed_order_count"
+      | "gross_purchase_value"
+      | "last_order_at"
+      | "created_at"
+    > & { registered_at: string };
+    summary: Record<string, string | number | null>;
+  }>(selectedId ? `api/v1/admin/customers/${selectedId}` : null);
+  const tabData = useLive<{
+    items?: Record<string, unknown>[];
+    accounts?: Record<string, unknown>[];
+    transactions?: Record<string, unknown>[];
+    refunds?: Record<string, unknown>[];
+    events?: Record<string, unknown>[];
+    notification_preferences?: Record<string, unknown>[];
+    preference_keys?: string[];
+    marketing_consent_evidence?: Record<string, unknown>[];
+    active_session_count?: number;
+  }>(
+    selectedId && tab !== "overview"
+      ? `api/v1/admin/customers/${selectedId}/${tab}`
+      : null,
+  );
+  const tabs = [
+    "overview",
+    "orders",
+    "payments",
+    "addresses",
+    "subscriptions",
+    "loyalty",
+    "referrals",
+    "campaigns",
+    "support",
+    "feedback",
+    "privacy",
+    "security",
+  ];
+
+  async function previewSegment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!cityId) return;
+    setSegmentBusy(true);
+    setSegmentError("");
+    try {
+      const conditions: { field: string; op: string; value: number }[] = [
+        { field: "order_count", op: "gte", value: Number(minimumOrders) },
+      ];
+      if (dormantDays)
+        conditions.push({
+          field: "last_order_days",
+          op: "gte",
+          value: Number(dormantDays),
+        });
+      const response = await fetch(
+        "/api/backend/api/v1/admin/customer-segments/preview",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ city_id: cityId, logic: "and", conditions }),
+          cache: "no-store",
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(result.detail ?? `Preview failed (${response.status})`);
+      setSegmentCount(Number(result.matched_count));
+    } catch (reason) {
+      setSegmentError(
+        reason instanceof Error ? reason.message : "Segment preview failed.",
+      );
+    } finally {
+      setSegmentBusy(false);
+    }
+  }
+
+  async function exportCustomers() {
+    if (!cityId) return;
+    const response = await fetch(
+      `/api/backend/api/v1/admin/customers-export?city_id=${cityId}&limit=500&purpose=customer_directory`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      window.alert(result.detail ?? `Export failed (${response.status})`);
+      return;
+    }
+    const blobUrl = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download =
+      response.headers
+        .get("content-disposition")
+        ?.match(/filename="([^"]+)"/)?.[1] ?? "quickbuddy-customers.csv";
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+
+  return (
+    <section className="qb-customer-workspace">
+      <section className="qb-panel qb-customer-directory">
+        <div className="qb-panel-head">
+          <div>
+            <h2>Customer directory</h2>
+            <p>
+              Authorized city scope · masked contact details · cursor pagination
+            </p>
+          </div>
+          <button
+            className="qb-outline"
+            disabled={!cityId}
+            onClick={() => void exportCustomers()}
+          >
+            <Download size={14} /> Export safe fields
+          </button>
+        </div>
+        <label className="qb-customer-search">
+          Search by customer name
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Start typing a name"
+          />
+        </label>
+        <form className="qb-segment-preview" onSubmit={previewSegment}>
+          <div>
+            <b>Segment preview</b>
+            <small>
+              Current authorized city · exact count · no audience export
+            </small>
+          </div>
+          <label>
+            Minimum orders
+            <input
+              type="number"
+              min="0"
+              max="100000"
+              value={minimumOrders}
+              onChange={(event) => setMinimumOrders(event.target.value)}
+            />
+          </label>
+          <label>
+            Dormant days
+            <input
+              type="number"
+              min="1"
+              max="3650"
+              placeholder="Any"
+              value={dormantDays}
+              onChange={(event) => setDormantDays(event.target.value)}
+            />
+          </label>
+          <button className="qb-outline" disabled={!cityId || segmentBusy}>
+            {segmentBusy ? "Counting…" : "Preview segment"}
+          </button>
+          {segmentCount !== null && (
+            <small className="qb-segment-count">
+              {segmentCount.toLocaleString()} matching customers
+            </small>
+          )}
+          {segmentError && (
+            <small className="qb-segment-error">{segmentError}</small>
+          )}
+        </form>
+        {!cityId ? (
+          <Empty
+            title="Select a city"
+            detail="Customer records are scoped to authorized cities."
+          />
+        ) : customers.error ? (
+          <Notice error={customers.error} />
+        ) : (
+          <div className="qb-customer-list">
+            {(customers.data?.items ?? []).map((row) => (
+              <button
+                key={row.id}
+                className={`qb-customer-card ${selectedId === row.id ? "selected" : ""}`}
+                onClick={() => {
+                  setSelectedId(row.id);
+                  setTab("overview");
+                }}
+              >
+                <span className="qb-customer-avatar">
+                  {row.name?.slice(0, 1)?.toUpperCase() ?? "C"}
+                </span>
+                <span className="qb-customer-identity">
+                  <b>{row.name || "Unnamed customer"}</b>
+                  <small>
+                    {row.email ?? row.phone ?? "No contact on file"}
+                  </small>
+                </span>
+                <span className="qb-customer-metrics">
+                  <b>{row.order_count} orders</b>
+                  <small>{row.status}</small>
+                </span>
+              </button>
+            ))}
+            {!customers.loading && !customers.data?.items.length && (
+              <Empty
+                title="No customers in this scope"
+                detail="Try another city or a shorter name search."
+              />
+            )}
+          </div>
+        )}
+        <p className="qb-customer-privacy">
+          This directory masks contact details and omits addresses and payment
+          identifiers. Values are historical gross purchases; refunds and
+          discount funding are not deducted.
+        </p>
+      </section>
+      <section className="qb-panel qb-customer-profile">
+        {!selectedId ? (
+          <Empty
+            title="Select a customer"
+            detail="Customer 360 loads only after you open a record."
+          />
+        ) : detail.error ? (
+          <Notice error={detail.error} />
+        ) : detail.loading || !detail.data ? (
+          <Empty
+            title="Loading Customer 360"
+            detail="Retrieving an authorized summary."
+          />
+        ) : (
+          <>
+            <div className="qb-customer-profile-head">
+              <span className="qb-customer-avatar large">
+                {detail.data.customer.name?.slice(0, 1)?.toUpperCase() ?? "C"}
+              </span>
+              <div>
+                <h2>{detail.data.customer.name || "Unnamed customer"}</h2>
+                <p>
+                  {detail.data.customer.status} · Registered{" "}
+                  {new Date(
+                    detail.data.customer.registered_at,
+                  ).toLocaleDateString()}
+                </p>
+                <small>
+                  {detail.data.customer.email ?? "Email unavailable"} ·{" "}
+                  {detail.data.customer.phone ?? "Phone unavailable"}
+                </small>
+              </div>
+            </div>
+            <div className="qb-customer-tabs" role="tablist">
+              {tabs.map((name) => (
+                <button
+                  key={name}
+                  role="tab"
+                  aria-selected={tab === name}
+                  className={tab === name ? "active" : ""}
+                  onClick={() => setTab(name)}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+            {tab === "overview" ? (
+              <div className="qb-customer-summary-grid">
+                {[
+                  ["Orders", detail.data.summary.order_count],
+                  ["Completed", detail.data.summary.completed_order_count],
+                  [
+                    "Gross purchases",
+                    `₹${detail.data.summary.gross_purchase_value}`,
+                  ],
+                  ["Refunds", `₹${detail.data.summary.refund_total}`],
+                  [
+                    "Loyalty points",
+                    detail.data.summary.loyalty_points_balance,
+                  ],
+                  [
+                    "Last order",
+                    detail.data.summary.last_order_at
+                      ? new Date(
+                          String(detail.data.summary.last_order_at),
+                        ).toLocaleDateString()
+                      : "—",
+                  ],
+                ].map(([label, value]) => (
+                  <article key={String(label)}>
+                    <small>{label}</small>
+                    <b>{value}</b>
+                  </article>
+                ))}
+                <p>{detail.data.summary.historical_contribution_note}</p>
+              </div>
+            ) : tabData.error ? (
+              <Notice error={tabData.error} />
+            ) : tabData.loading ? (
+              <Empty
+                title={`Loading ${tab}`}
+                detail="Fetching a bounded customer history page."
+              />
+            ) : (
+              <div className="qb-customer-tab-data">
+                {tab === "privacy" && (
+                  <article>
+                    <b>Marketing consent</b>
+                    <small>
+                      Customer-authored consent events. Notification preferences
+                      are shown separately.
+                      {tabData.data?.preference_keys?.length
+                        ? ` Other preference keys: ${tabData.data.preference_keys.join(", ")}`
+                        : " No other preference keys are recorded."}
+                    </small>
+                  </article>
+                )}
+                {tab === "security" && (
+                  <article>
+                    <b>
+                      {tabData.data?.active_session_count ?? 0} active sessions
+                    </b>
+                    <small>
+                      Read-only security summary; session revocation is not
+                      available in CRM.
+                    </small>
+                  </article>
+                )}
+                {(tabData.data?.items ?? tabData.data?.accounts ?? []).map(
+                  (row, index) => (
+                    <article key={String(row.id ?? `${tab}-${index}`)}>
+                      <b>
+                        {String(
+                          row.subject ??
+                            row.plan ??
+                            row.program ??
+                            row.status ??
+                            row.rating ??
+                            "Customer record",
+                        )}
+                      </b>
+                      <small>
+                        {Object.entries(row)
+                          .filter(([key]) => key !== "id")
+                          .map(
+                            ([key, value]) =>
+                              `${key.replaceAll("_", " ")}: ${String(value ?? "—")}`,
+                          )
+                          .join(" · ")}
+                      </small>
+                    </article>
+                  ),
+                )}
+                {tab === "loyalty" &&
+                  (tabData.data?.transactions ?? []).map((row, index) => (
+                    <article key={`txn-${index}`}>
+                      <b>{String(row.points)} points movement</b>
+                      <small>{String(row.created_at)}</small>
+                    </article>
+                  ))}
+                {[
+                  ...(tabData.data?.refunds ?? []),
+                  ...(tabData.data?.notification_preferences ?? []),
+                  ...(tabData.data?.marketing_consent_evidence ?? []),
+                  ...(tabData.data?.events ?? []),
+                ].map((row, index) => (
+                  <article key={`extra-${index}`}>
+                    <b>
+                      {String(
+                        row.status ??
+                          row.channel ??
+                          row.type ??
+                          ("enabled" in row
+                            ? `Marketing ${row.enabled ? "opt-in" : "opt-out"}`
+                            : "Record"),
+                      )}
+                    </b>
+                    <small>
+                      {Object.entries(row)
+                        .map(
+                          ([key, value]) =>
+                            `${key.replaceAll("_", " ")}: ${String(value ?? "—")}`,
+                        )
+                        .join(" · ")}
+                    </small>
+                  </article>
+                ))}
+                {!tabData.data?.items?.length &&
+                  !tabData.data?.accounts?.length &&
+                  !tabData.data?.transactions?.length &&
+                  !tabData.data?.refunds?.length &&
+                  !tabData.data?.notification_preferences?.length &&
+                  !tabData.data?.marketing_consent_evidence?.length &&
+                  !tabData.data?.events?.length &&
+                  !tabData.data?.preference_keys?.length &&
+                  !tabData.data?.active_session_count && (
+                    <Empty
+                      title={`No ${tab} records`}
+                      detail="No records are available in the connected Quickbuddy systems."
+                    />
+                  )}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+    </section>
   );
 }

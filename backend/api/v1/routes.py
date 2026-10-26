@@ -1,15 +1,18 @@
 import asyncio
 import base64
+import csv
 import hashlib
 import hmac
+import io
 import json
 from datetime import timedelta
 from decimal import Decimal
 from time import perf_counter
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Header, Query, Request, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import aliased
@@ -32,6 +35,8 @@ from backend.application import (
 from backend.application.common import add, audit, branch_scope, event, now, owned, scoped
 from backend.domain.rules import BusinessError, money
 from backend.integrations.payments.razorpay import RazorpayGateway
+from backend.modules.bulk_data import service as bulk_data
+from backend.modules.customer_admin import service as customer_admin
 from backend.modules.fulfillment import eta as eta_engine
 from backend.modules.tracking import service as tracking
 from backend.modules.tracking.realtime import publish
@@ -145,6 +150,85 @@ async def memberships(actor: Actor, db: DB, cursor: str | None = None, limit: Li
     return await page(
         db, m.Membership, [m.Membership.user_id == UUID(actor.subject)], s.IdOut, cursor, limit
     )
+
+
+async def _require_customer_account(db, actor):
+    user_id = UUID(actor.subject)
+    is_customer = await db.scalar(
+        select(m.RoleAssignment.id)
+        .join(m.Role, m.Role.id == m.RoleAssignment.role_id)
+        .where(m.RoleAssignment.user_id == user_id, m.Role.name == "customer")
+        .limit(1)
+    )
+    if not is_customer:
+        raise BusinessError("forbidden", "Customer account required", 403)
+    return user_id
+
+
+@router.get("/me/consents", tags=["Customer privacy"])
+async def customer_consent_state(actor: Actor, db: DB):
+    user_id = await _require_customer_account(db, actor)
+    events = (
+        await db.scalars(
+            select(m.CustomerConsentEvent)
+            .where(m.CustomerConsentEvent.user_id == user_id)
+            .order_by(m.CustomerConsentEvent.created_at.desc(), m.CustomerConsentEvent.id.desc())
+            .limit(100)
+        )
+    ).all()
+    latest = {}
+    for event_row in events:
+        key = (event_row.purpose, event_row.channel)
+        latest.setdefault(
+            key,
+            {
+                "purpose": event_row.purpose,
+                "channel": event_row.channel,
+                "enabled": event_row.enabled,
+                "policy_version": event_row.policy_version,
+                "recorded_at": event_row.created_at.isoformat(),
+            },
+        )
+    return {"items": list(latest.values())}
+
+
+@router.post("/me/consents", tags=["Customer privacy"])
+async def record_customer_consent(body: s.CustomerConsentIn, key: Key, actor: Actor, db: DB):
+    user_id = await _require_customer_account(db, actor)
+    existing = await db.scalar(
+        select(m.CustomerConsentEvent).where(m.CustomerConsentEvent.idempotency_key == key)
+    )
+    if existing:
+        if existing.user_id != user_id:
+            raise BusinessError("idempotency_conflict", "Idempotency key already used", 409)
+        return {"id": str(existing.id), "enabled": existing.enabled, "replayed": True}
+    if body.enabled and body.channel == "email":
+        verified = await db.scalar(
+            select(m.Email.id).where(m.Email.user_id == user_id, m.Email.verified_at.is_not(None))
+        )
+        if not verified:
+            raise BusinessError("verified_contact_required", "Verify email before opting in", 409)
+    if body.enabled and body.channel in {"sms", "whatsapp"}:
+        phone = F["identity.user_phone_numbers"]
+        verified = await db.scalar(
+            select(phone.id)
+            .where(phone.user_id == user_id, phone.verified_at.is_not(None))
+            .limit(1)
+        )
+        if not verified:
+            raise BusinessError("verified_contact_required", "Verify phone before opting in", 409)
+    row = await add(
+        db,
+        m.CustomerConsentEvent,
+        user_id=user_id,
+        purpose=body.purpose,
+        channel=body.channel,
+        enabled=body.enabled,
+        policy_version=body.policy_version,
+        source="authenticated_customer_api",
+        idempotency_key=key,
+    )
+    return {"id": str(row.id), "enabled": row.enabled, "replayed": False}
 
 
 @router.post("/auth/challenges", response_model=s.IdOut, status_code=201, tags=["Identity"])
@@ -4288,3 +4372,1199 @@ async def cancel_order(order_id: UUID, body: s.VersionIn, actor: Actor, request:
 async def notifications(actor: Actor, db: DB, cursor: str | None = None, limit: Limit = 50):
     model = F["operations.notification_jobs"]
     return await page(db, model, [model.user_id == UUID(actor.subject)], s.StateOut, cursor, limit)
+
+
+def _bulk_job_out(job):
+    return {
+        "id": str(job.id),
+        "entity": job.kind,
+        "status": job.status,
+        "row_count": job.row_count,
+        "valid_count": job.valid_count,
+        "created_count": job.created_count,
+        "failed_count": job.failed_count,
+        "previewed": job.previewed_at is not None,
+        "created_at": job.created_at.isoformat(),
+    }
+
+
+async def _owned_bulk_job(db, actor, job_id, lock=False):
+    statement = select(m.BulkJob).where(
+        m.BulkJob.id == job_id, m.BulkJob.actor_id == UUID(actor.subject)
+    )
+    if lock:
+        statement = statement.with_for_update()
+    job = await db.scalar(statement)
+    if job is None:
+        raise BusinessError("bulk_job_not_found", "Bulk job was not found", 404)
+    return job
+
+
+async def _validate_branch_job(db, actor, job):
+    rows = (
+        await db.scalars(
+            select(m.BulkJobRow)
+            .where(m.BulkJobRow.job_id == job.id)
+            .order_by(m.BulkJobRow.row_number)
+        )
+    ).all()
+    seen = set()
+    valid = failed = 0
+    for row in rows:
+        payload = bulk_data.apply_mapping(row.raw_payload, job.mapping)
+        errors = []
+        warnings = []
+        source_key = payload["external_ref"].strip()
+        if not source_key or len(source_key) > 200:
+            errors.append({"field": "external_ref", "code": "required_or_too_long"})
+        if source_key and source_key in seen:
+            errors.append({"field": "external_ref", "code": "duplicate_in_file"})
+        if source_key:
+            seen.add(source_key)
+        if not payload["branch_name"] or len(payload["branch_name"]) > 200:
+            errors.append({"field": "branch_name", "code": "required_or_too_long"})
+        if payload["branch_name"].lstrip()[:1] in {"=", "+", "-", "@"}:
+            errors.append({"field": "branch_name", "code": "unsafe_spreadsheet_formula"})
+        try:
+            brand_id = UUID(payload["brand_id"])
+        except (ValueError, TypeError):
+            brand_id = None
+            errors.append({"field": "brand_id", "code": "invalid_uuid"})
+        try:
+            city_id = UUID(payload["city_id"])
+        except (ValueError, TypeError):
+            city_id = None
+            errors.append({"field": "city_id", "code": "invalid_uuid"})
+        try:
+            latitude = Decimal(payload["latitude"])
+            if (
+                not latitude.is_finite()
+                or not -90 <= latitude <= 90
+                or latitude.as_tuple().exponent < -7
+                or latitude.adjusted() > 2
+            ):
+                raise ValueError
+        except (ValueError, ArithmeticError):
+            latitude = None
+            errors.append({"field": "latitude", "code": "out_of_range"})
+        try:
+            longitude = Decimal(payload["longitude"])
+            if (
+                not longitude.is_finite()
+                or not -180 <= longitude <= 180
+                or longitude.as_tuple().exponent < -7
+                or longitude.adjusted() > 2
+            ):
+                raise ValueError
+        except (ValueError, ArithmeticError):
+            longitude = None
+            errors.append({"field": "longitude", "code": "out_of_range"})
+        brand = await db.get(m.Brand, brand_id) if brand_id else None
+        city = await db.get(m.City, city_id) if city_id else None
+        authorized_scope = False
+        if not brand or not city or not city.active:
+            if brand_id and city_id:
+                errors.append({"field": "references", "code": "unavailable"})
+        elif not any(error["field"] in {"brand_id", "city_id"} for error in errors):
+            try:
+                await scoped(db, actor, "merchant.write", brand.organization_id, city.id)
+                authorized_scope = True
+            except BusinessError:
+                errors.append({"field": "references", "code": "unavailable"})
+        if source_key and authorized_scope:
+            reference = await db.scalar(
+                select(m.BulkExternalRef.id).where(
+                    m.BulkExternalRef.entity == "branch", m.BulkExternalRef.source_key == source_key
+                )
+            )
+            if reference:
+                errors.append({"field": "external_ref", "code": "already_imported"})
+        if authorized_scope and brand and city and payload["branch_name"]:
+            duplicate = await db.scalar(
+                select(m.Branch.id)
+                .where(
+                    m.Branch.brand_id == brand.id,
+                    m.Branch.city_id == city.id,
+                    func.lower(m.Branch.name) == payload["branch_name"].lower(),
+                )
+                .limit(1)
+            )
+            if duplicate:
+                warnings.append({"field": "branch_name", "code": "possible_existing_branch"})
+        row.payload = {
+            **payload,
+            "brand_id": str(brand_id) if brand_id else "",
+            "city_id": str(city_id) if city_id else "",
+            "latitude": str(latitude) if latitude is not None else "",
+            "longitude": str(longitude) if longitude is not None else "",
+        }
+        row.errors = errors + warnings
+        row.status = "valid" if not errors else "invalid"
+        valid += int(not errors)
+        failed += int(bool(errors))
+    job.valid_count = valid
+    job.failed_count = failed
+    job.status = "VALIDATED"
+    return rows
+
+
+@router.get("/bulk/templates/{entity}", tags=["Bulk data"])
+async def bulk_template(entity: str):
+    if entity != "branches":
+        raise BusinessError("template_not_found", "Only branch onboarding CSV is available", 404)
+    content = "external_ref,brand_id,city_id,branch_name,latitude,longitude\n"
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="quickbuddy-branches-template.csv"'},
+    )
+
+
+@router.post(
+    "/bulk/imports",
+    status_code=201,
+    tags=["Bulk data"],
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"text/csv": {"schema": {"type": "string"}}},
+        }
+    },
+)
+async def create_bulk_import(
+    request: Request,
+    actor: Actor,
+    db: DB,
+    idempotency_key: Key,
+    entity: Annotated[str, Header(alias="X-Bulk-Entity")],
+):
+    if entity != "branches":
+        raise BusinessError("bulk_entity_not_supported", "Only branch onboarding is enabled", 422)
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            declared_length = int(content_length)
+        except ValueError as exc:
+            raise BusinessError("invalid_content_length", "Invalid content length", 400) from exc
+        if declared_length < 0 or declared_length > bulk_data.MAX_UPLOAD_BYTES:
+            raise BusinessError("bulk_file_size", "CSV is limited to 5 MiB", 413)
+    permission = await db.scalar(
+        select(func.count())
+        .select_from(m.RoleAssignment)
+        .join(m.Role, m.Role.id == m.RoleAssignment.role_id)
+        .join(m.RolePermission, m.RolePermission.role_id == m.Role.id)
+        .join(m.Permission, m.Permission.id == m.RolePermission.permission_id)
+        .where(
+            m.RoleAssignment.user_id == UUID(actor.subject),
+            m.Permission.code == "merchant.write",
+        )
+    )
+    if not permission:
+        raise BusinessError("forbidden", "Merchant write permission is required", 403)
+    if not request.headers.get("content-type", "").lower().startswith("text/csv"):
+        raise BusinessError("bulk_content_type", "Upload a CSV file as text/csv", 415)
+    content = bytearray()
+    async for chunk in request.stream():
+        content.extend(chunk)
+        if len(content) > bulk_data.MAX_UPLOAD_BYTES:
+            raise BusinessError("bulk_file_size", "CSV is limited to 5 MiB", 413)
+    source_hash = hashlib.sha256(content).hexdigest()
+    existing = await db.scalar(
+        select(m.BulkJob).where(
+            m.BulkJob.actor_id == UUID(actor.subject), m.BulkJob.idempotency_key == idempotency_key
+        )
+    )
+    if existing:
+        if existing.source_hash != source_hash or existing.kind != entity:
+            raise BusinessError(
+                "idempotency_conflict", "Idempotency key was used for another file", 409
+            )
+        return _bulk_job_out(existing)
+    recent_jobs = await db.scalar(
+        select(func.count())
+        .select_from(m.BulkJob)
+        .where(
+            m.BulkJob.actor_id == UUID(actor.subject),
+            m.BulkJob.created_at >= now() - timedelta(hours=1),
+        )
+    )
+    if recent_jobs >= 20:
+        raise BusinessError("bulk_rate_limited", "Import job limit reached; retry later", 429)
+    headers, source_rows = bulk_data.parse_csv(bytes(content))
+    if not source_rows:
+        raise BusinessError("bulk_empty_file", "CSV must contain at least one data row", 422)
+    job = await add(
+        db,
+        m.BulkJob,
+        actor_id=UUID(actor.subject),
+        kind=entity,
+        status="VALIDATED",
+        idempotency_key=idempotency_key,
+        source_hash=source_hash,
+        row_count=len(source_rows),
+        mapping={field: field for field in bulk_data.BRANCH_FIELDS},
+    )
+    for row_number, row_payload in enumerate(source_rows, start=2):
+        canonical = bulk_data.apply_mapping(row_payload, {})
+        await add(
+            db,
+            m.BulkJobRow,
+            job_id=job.id,
+            row_number=row_number,
+            source_key=canonical.get("external_ref", "") or f"row-{row_number}",
+            raw_payload=row_payload,
+            payload=canonical,
+            errors=[],
+            status="valid",
+        )
+    await _validate_branch_job(db, actor, job)
+    await audit(
+        db,
+        actor,
+        "bulk.import.created",
+        job.id,
+        request.state.request_id,
+        current=job.status,
+        version=1,
+    )
+    return _bulk_job_out(job)
+
+
+@router.post("/bulk/imports/{job_id}/mapping", tags=["Bulk data"])
+async def map_bulk_import(
+    job_id: UUID, body: s.BulkMappingIn, request: Request, actor: Actor, db: DB
+):
+    job = await _owned_bulk_job(db, actor, job_id, lock=True)
+    if job.status != "VALIDATED" or job.previewed_at is not None:
+        raise BusinessError("bulk_job_locked", "Mapping is locked after preview or commit", 409)
+    rows = (
+        await db.scalars(select(m.BulkJobRow).where(m.BulkJobRow.job_id == job.id).limit(1))
+    ).first()
+    headers = list(rows.raw_payload) if rows else []
+    job.mapping = bulk_data.validate_mapping(body.mapping, headers)
+    await _validate_branch_job(db, actor, job)
+    await audit(
+        db,
+        actor,
+        "bulk.import.mapped",
+        job.id,
+        request.state.request_id,
+        current="mapped",
+        version=1,
+    )
+    return _bulk_job_out(job)
+
+
+@router.post("/bulk/imports/{job_id}/validate", tags=["Bulk data"])
+async def validate_bulk_import(job_id: UUID, request: Request, actor: Actor, db: DB):
+    job = await _owned_bulk_job(db, actor, job_id, lock=True)
+    if job.status != "VALIDATED" or job.previewed_at is not None:
+        raise BusinessError("bulk_job_locked", "Only uncommitted jobs can be validated", 409)
+    await _validate_branch_job(db, actor, job)
+    await audit(
+        db,
+        actor,
+        "bulk.import.validated",
+        job.id,
+        request.state.request_id,
+        current=job.status,
+        version=1,
+    )
+    return _bulk_job_out(job)
+
+
+@router.post("/bulk/imports/{job_id}/dry-run", tags=["Bulk data"])
+async def preview_bulk_import(job_id: UUID, request: Request, actor: Actor, db: DB):
+    job = await _owned_bulk_job(db, actor, job_id, lock=True)
+    if job.status != "VALIDATED":
+        raise BusinessError("bulk_job_locked", "Only validated jobs can be previewed", 409)
+    job.previewed_at = now()
+    await audit(
+        db,
+        actor,
+        "bulk.import.previewed",
+        job.id,
+        request.state.request_id,
+        current="previewed",
+        version=1,
+    )
+    rows = (
+        await db.scalars(
+            select(m.BulkJobRow)
+            .where(m.BulkJobRow.job_id == job.id)
+            .order_by(m.BulkJobRow.row_number)
+            .limit(100)
+        )
+    ).all()
+    return {
+        **_bulk_job_out(job),
+        "rows": [
+            {
+                "row_number": row.row_number,
+                "status": row.status,
+                "external_ref": row.payload.get("external_ref", ""),
+                "branch_name": row.payload.get("branch_name", ""),
+                "issues": row.errors,
+            }
+            for row in rows
+        ],
+        "truncated": job.row_count > len(rows),
+    }
+
+
+@router.post("/bulk/imports/{job_id}/commit", tags=["Bulk data"])
+async def commit_bulk_import(job_id: UUID, request: Request, actor: Actor, db: DB):
+    job = await _owned_bulk_job(db, actor, job_id, lock=True)
+    if job.status in {"COMPLETED", "PARTIALLY_COMPLETED"}:
+        return _bulk_job_out(job)
+    if job.status != "VALIDATED" or job.previewed_at is None:
+        raise BusinessError("bulk_preview_required", "Validate and preview the import first", 409)
+    if job.valid_count > 200:
+        raise BusinessError("bulk_chunk_limit", "Synchronous commit is limited to 200 rows", 422)
+    rows = (
+        await db.scalars(
+            select(m.BulkJobRow)
+            .where(m.BulkJobRow.job_id == job.id, m.BulkJobRow.status == "valid")
+            .order_by(m.BulkJobRow.row_number)
+            .with_for_update()
+        )
+    ).all()
+    created = failed = 0
+    for row in rows:
+        payload = row.payload
+        brand_id, city_id = UUID(payload["brand_id"]), UUID(payload["city_id"])
+        brand = await db.get(m.Brand, brand_id)
+        city = await db.get(m.City, city_id)
+        if not brand or not city or not city.active:
+            row.status = "invalid"
+            row.errors = [{"field": "reference", "code": "changed_since_preview"}]
+            failed += 1
+            continue
+        await scoped(db, actor, "merchant.write", brand.organization_id, city.id)
+        branch_id = uuid4()
+        ref_id = await db.scalar(
+            insert(m.BulkExternalRef)
+            .values(
+                id=uuid4(), entity="branch", source_key=payload["external_ref"], record_id=branch_id
+            )
+            .on_conflict_do_nothing(index_elements=["entity", "source_key"])
+            .returning(m.BulkExternalRef.id)
+        )
+        if ref_id is None:
+            row.status = "conflict"
+            row.errors = [{"field": "external_ref", "code": "already_imported"}]
+            failed += 1
+            continue
+        await add(
+            db,
+            m.Branch,
+            id=branch_id,
+            brand_id=brand.id,
+            organization_id=brand.organization_id,
+            city_id=city.id,
+            name=payload["branch_name"],
+            latitude=Decimal(payload["latitude"]),
+            longitude=Decimal(payload["longitude"]),
+            status="pending",
+            accepting_orders=False,
+            version=1,
+        )
+        await audit(
+            db,
+            actor,
+            "merchant.branch.bulk_created",
+            branch_id,
+            request.state.request_id,
+            organization_id=brand.organization_id,
+            current="pending",
+            version=1,
+        )
+        row.status = "committed"
+        row.record_id = branch_id
+        created += 1
+    job.created_count = created
+    job.failed_count += failed
+    job.status = "COMPLETED" if failed == 0 else "PARTIALLY_COMPLETED" if created else "FAILED"
+    await audit(
+        db,
+        actor,
+        "bulk.import.committed",
+        job.id,
+        request.state.request_id,
+        current=job.status,
+        version=2,
+    )
+    return _bulk_job_out(job)
+
+
+@router.get("/bulk/imports/{job_id}", tags=["Bulk data"])
+async def get_bulk_import(job_id: UUID, actor: Actor, db: DB):
+    return _bulk_job_out(await _owned_bulk_job(db, actor, job_id))
+
+
+@router.get("/bulk/imports/{job_id}/errors", tags=["Bulk data"])
+async def get_bulk_import_errors(job_id: UUID, actor: Actor, db: DB, limit: int = 100):
+    if limit < 1 or limit > 500:
+        raise BusinessError("invalid_limit", "Error page limit must be from 1 to 500", 422)
+    job = await _owned_bulk_job(db, actor, job_id)
+    rows = (
+        await db.scalars(
+            select(m.BulkJobRow)
+            .where(m.BulkJobRow.job_id == job.id, m.BulkJobRow.errors != [])
+            .order_by(m.BulkJobRow.row_number)
+            .limit(limit)
+        )
+    ).all()
+    return {"items": [{"row_number": row.row_number, "issues": row.errors} for row in rows]}
+
+
+@router.get("/bulk/jobs", tags=["Bulk data"])
+async def list_bulk_jobs(actor: Actor, db: DB, limit: int = 50):
+    if limit < 1 or limit > 100:
+        raise BusinessError("invalid_limit", "Job limit must be from 1 to 100", 422)
+    rows = (
+        await db.scalars(
+            select(m.BulkJob)
+            .where(m.BulkJob.actor_id == UUID(actor.subject))
+            .order_by(m.BulkJob.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {"items": [_bulk_job_out(job) for job in rows]}
+
+
+@router.post("/bulk/jobs/{job_id}/cancel", tags=["Bulk data"])
+async def cancel_bulk_job(job_id: UUID, request: Request, actor: Actor, db: DB):
+    job = await _owned_bulk_job(db, actor, job_id, lock=True)
+    if job.status != "VALIDATED":
+        raise BusinessError(
+            "bulk_job_not_cancellable", "Only uncommitted jobs can be cancelled", 409
+        )
+    job.status = "CANCELLED"
+    await audit(
+        db,
+        actor,
+        "bulk.import.cancelled",
+        job.id,
+        request.state.request_id,
+        current=job.status,
+        version=1,
+    )
+    return _bulk_job_out(job)
+
+
+@router.post("/bulk/exports", tags=["Bulk data"])
+async def export_branches(body: s.BulkExportIn, request: Request, actor: Actor, db: DB):
+    rows = (
+        await db.execute(
+            select(m.Branch, m.Brand.merchant_type)
+            .join(m.Brand, m.Brand.id == m.Branch.brand_id)
+            .where(m.Branch.city_id == body.city_id)
+            .order_by(m.Branch.created_at.desc())
+            .limit(body.limit + 1)
+        )
+    ).all()
+    if len(rows) > body.limit:
+        raise BusinessError(
+            "export_limit", "Filter results to at most 500 branches per export", 413
+        )
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "branch_id",
+            "organization_id",
+            "brand_id",
+            "city_id",
+            "branch_name",
+            "merchant_type",
+            "status",
+            "accepting_orders",
+            "latitude",
+            "longitude",
+        ]
+    )
+    exported = 0
+    for branch, merchant_type in rows:
+        try:
+            await scoped(
+                db, actor, "merchant.export", branch.organization_id, branch.city_id, branch.id
+            )
+        except BusinessError:
+            continue
+        # CSV formula escaping applies to text fields; IDs/numbers remain unchanged.
+        text_values = [branch.name, merchant_type, branch.status]
+        safe = ["'" + value if value[:1] in "=+-@" else value for value in text_values]
+        writer.writerow(
+            [
+                str(branch.id),
+                str(branch.organization_id),
+                str(branch.brand_id),
+                str(branch.city_id),
+                safe[0],
+                safe[1],
+                safe[2],
+                branch.accepting_orders,
+                branch.latitude,
+                branch.longitude,
+            ]
+        )
+        exported += 1
+    if not exported:
+        raise BusinessError("forbidden", "No branches are available in this authorized scope", 403)
+    await audit(
+        db,
+        actor,
+        "bulk.export.branches",
+        body.city_id,
+        request.state.request_id,
+        current=f"rows:{exported}",
+        version=1,
+    )
+    stamp = now().strftime("%Y%m%dT%H%M%SZ")
+    return StreamingResponse(
+        iter(["\ufeff" + output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="quickbuddy-branches-{stamp}.csv"',
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+@router.get("/admin/customers", tags=["Customer administration"])
+async def admin_customers(
+    actor: Actor,
+    db: DB,
+    city_id: UUID,
+    q: str | None = Query(default=None, max_length=80),
+    status: str | None = Query(default=None, pattern="^(active|restricted|suspended|pending)$"),
+    after: UUID | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    global_access, organization_ids, city_ids = await customer_admin.customer_scope(db, actor)
+    if not global_access and city_id not in city_ids:
+        # Organization-scoped administrators may select only cities containing their own orders.
+        if not organization_ids:
+            raise BusinessError("forbidden", "City is outside customer administration scope", 403)
+    return await customer_admin.list_customers(
+        db,
+        global_access=global_access,
+        organization_ids=organization_ids,
+        city_ids=city_ids,
+        city_id=city_id,
+        query=q,
+        status=status,
+        limit=limit,
+        after=after,
+    )
+
+
+async def _admin_customer_scope(db, actor, customer_id):
+    global_access, organization_ids, city_ids = await customer_admin.customer_scope(db, actor)
+    customer = await customer_admin.require_customer(
+        db,
+        customer_id,
+        global_access=global_access,
+        organization_ids=organization_ids,
+        city_ids=city_ids,
+    )
+    return customer, global_access, organization_ids, city_ids
+
+
+def _customer_order_scope(global_access, organization_ids, city_ids):
+    stmt = (
+        select(m.Order)
+        .join(m.MerchantOrder, m.MerchantOrder.order_id == m.Order.id)
+        .join(m.Branch, m.Branch.id == m.MerchantOrder.branch_id)
+    )
+    scope_filter = customer_admin._scope_filter(m.Branch, global_access, organization_ids, city_ids)
+    stmt = stmt.where(scope_filter) if scope_filter is not None else stmt
+    return stmt.distinct()
+
+
+@router.get("/admin/customers/{customer_id}", tags=["Customer administration"])
+async def admin_customer_360(customer_id: UUID, request: Request, actor: Actor, db: DB):
+    customer, global_access, organization_ids, city_ids = await _admin_customer_scope(
+        db, actor, customer_id
+    )
+    order_rows = (
+        _customer_order_scope(global_access, organization_ids, city_ids)
+        .where(m.Order.user_id == customer_id)
+        .subquery()
+    )
+    summary = (
+        await db.execute(
+            select(
+                func.count(order_rows.c.id),
+                func.count(order_rows.c.id).filter(order_rows.c.status == "completed"),
+                func.coalesce(func.sum(order_rows.c.total), 0),
+                func.max(order_rows.c.created_at),
+            )
+        )
+    ).one()
+    order_count, completed_count, gross_value, last_order_at = summary
+    loyalty = F["engagement.loyalty_accounts"]
+    points = await db.scalar(
+        select(func.coalesce(func.sum(loyalty.points), 0)).where(loyalty.user_id == customer_id)
+    )
+    refunds = (
+        await db.scalar(
+            select(func.coalesce(func.sum(m.Refund.amount), 0))
+            .join(m.PaymentIntent, m.PaymentIntent.id == m.Refund.payment_id)
+            .join(m.Order, m.Order.id == m.PaymentIntent.order_id)
+            .where(m.Order.user_id == customer_id, m.Order.id.in_(select(order_rows.c.id)))
+        )
+    ) or 0
+    await audit(
+        db,
+        actor,
+        "customer.360.read",
+        customer_id,
+        request.state.request_id,
+        current="summary",
+        version=1,
+    )
+    return {
+        "customer": customer,
+        "summary": {
+            "order_count": int(order_count or 0),
+            "completed_order_count": int(completed_count or 0),
+            "order_frequency": "historical completed order count; interval not estimated",
+            "gross_purchase_value": str(gross_value or 0),
+            "refund_total": str(refunds),
+            "historical_contribution": None,
+            "historical_contribution_note": (
+                "Not calculated: attributable platform/service costs are not modeled here."
+            ),
+            "last_order_at": last_order_at.isoformat() if last_order_at else None,
+            "loyalty_points_balance": int(points or 0),
+        },
+        "tabs": [
+            "overview",
+            "orders",
+            "payments",
+            "addresses",
+            "subscriptions",
+            "loyalty",
+            "referrals",
+            "campaigns",
+            "support",
+            "feedback",
+            "privacy",
+            "security",
+        ],
+    }
+
+
+@router.get("/admin/customers/{customer_id}/orders", tags=["Customer administration"])
+async def admin_customer_orders(
+    customer_id: UUID,
+    actor: Actor,
+    db: DB,
+    after: UUID | None = None,
+    limit: int = Query(default=25, ge=1, le=100),
+):
+    _, global_access, organization_ids, city_ids = await _admin_customer_scope(
+        db, actor, customer_id
+    )
+    stmt = _customer_order_scope(global_access, organization_ids, city_ids).where(
+        m.Order.user_id == customer_id
+    )
+    if after:
+        stmt = stmt.where(m.Order.id < after)
+    rows = (await db.scalars(stmt.order_by(m.Order.id.desc()).limit(limit + 1))).all()
+    more = len(rows) > limit
+    rows = rows[:limit]
+    return {
+        "items": [
+            {
+                "id": str(row.id),
+                "status": row.status,
+                "total": str(row.total),
+                "currency": row.currency,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ],
+        "next_cursor": str(rows[-1].id) if more else None,
+    }
+
+
+@router.get("/admin/customers/{customer_id}/loyalty", tags=["Customer administration"])
+async def admin_customer_loyalty(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=25, ge=1, le=100)
+):
+    await _admin_customer_scope(db, actor, customer_id)
+    account = F["engagement.loyalty_accounts"]
+    transaction = F["engagement.loyalty_transactions"]
+    accounts = (
+        await db.execute(
+            select(account.id, account.program_code, account.points, account.created_at)
+            .where(account.user_id == customer_id)
+            .order_by(account.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    history = (
+        await db.execute(
+            select(transaction.points, transaction.order_id, transaction.created_at)
+            .join(account, account.id == transaction.account_id)
+            .where(account.user_id == customer_id)
+            .order_by(transaction.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "accounts": [
+            {
+                "id": str(aid),
+                "program": code,
+                "points_balance": points,
+                "created_at": created.isoformat(),
+            }
+            for aid, code, points, created in accounts
+        ],
+        "transactions": [
+            {
+                "points": points,
+                "order_id": str(order_id) if order_id else None,
+                "created_at": created.isoformat(),
+            }
+            for points, order_id, created in history
+        ],
+    }
+
+
+@router.get("/admin/customers/{customer_id}/subscriptions", tags=["Customer administration"])
+async def admin_customer_subscriptions(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=25, ge=1, le=100)
+):
+    await _admin_customer_scope(db, actor, customer_id)
+    subscription = F["engagement.customer_subscriptions"]
+    plan = F["engagement.subscription_plans"]
+    rows = (
+        await db.execute(
+            select(
+                subscription.id,
+                plan.name,
+                subscription.status,
+                subscription.starts_at,
+                subscription.ends_at,
+            )
+            .join(plan, plan.id == subscription.plan_id)
+            .where(subscription.user_id == customer_id)
+            .order_by(subscription.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "items": [
+            {
+                "id": str(sid),
+                "plan": name,
+                "status": status,
+                "starts_at": start.isoformat(),
+                "ends_at": end.isoformat() if end else None,
+            }
+            for sid, name, status, start, end in rows
+        ]
+    }
+
+
+@router.get("/admin/customers/{customer_id}/support", tags=["Customer administration"])
+async def admin_customer_support(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=25, ge=1, le=100)
+):
+    await _admin_customer_scope(db, actor, customer_id)
+    rows = (
+        await db.scalars(
+            select(m.Ticket)
+            .where(m.Ticket.user_id == customer_id)
+            .order_by(m.Ticket.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "items": [
+            {
+                "id": str(row.id),
+                "subject": row.subject,
+                "status": row.status,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.get("/admin/customers/{customer_id}/feedback", tags=["Customer administration"])
+async def admin_customer_feedback(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=25, ge=1, le=100)
+):
+    await _admin_customer_scope(db, actor, customer_id)
+    review = F["engagement.reviews"]
+    rows = (
+        await db.execute(
+            select(
+                review.id,
+                review.order_item_id,
+                review.rating,
+                review.moderation_status,
+                review.created_at,
+            )
+            .where(review.user_id == customer_id)
+            .order_by(review.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "items": [
+            {
+                "id": str(rid),
+                "order_item_id": str(item_id),
+                "rating": rating,
+                "moderation_status": state,
+                "created_at": created.isoformat(),
+            }
+            for rid, item_id, rating, state, created in rows
+        ]
+    }
+
+
+@router.get("/admin/customers/{customer_id}/payments", tags=["Customer administration"])
+async def admin_customer_payments(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=25, ge=1, le=100)
+):
+    _, global_access, organization_ids, city_ids = await _admin_customer_scope(
+        db, actor, customer_id
+    )
+    scoped_orders = (
+        _customer_order_scope(global_access, organization_ids, city_ids)
+        .where(m.Order.user_id == customer_id)
+        .subquery()
+    )
+    payments = (
+        (
+            await db.execute(
+                select(m.PaymentIntent)
+                .where(m.PaymentIntent.order_id.in_(select(scoped_orders.c.id)))
+                .order_by(m.PaymentIntent.created_at.desc())
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    payment_ids = [row.id for row in payments]
+    refunds = []
+    if payment_ids:
+        refunds = (
+            await db.scalars(
+                select(m.Refund)
+                .where(m.Refund.payment_id.in_(payment_ids))
+                .order_by(m.Refund.created_at.desc())
+                .limit(limit)
+            )
+        ).all()
+    return {
+        "items": [
+            {
+                "id": str(row.id),
+                "order_id": str(row.order_id),
+                "status": row.status,
+                "amount": str(row.amount),
+                "refunded": str(row.refunded),
+                "currency": row.currency,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in payments
+        ],
+        "refunds": [
+            {
+                "payment_id": str(row.payment_id),
+                "amount": str(row.amount),
+                "status": row.status,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in refunds
+        ],
+    }
+
+
+@router.get("/admin/customers/{customer_id}/addresses", tags=["Customer administration"])
+async def admin_customer_addresses(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=25, ge=1, le=100)
+):
+    await _admin_customer_scope(db, actor, customer_id)
+    rows = (
+        await db.execute(
+            select(m.Address.id, m.Address.label, m.City.name, m.Address.created_at)
+            .join(m.City, m.City.id == m.Address.city_id)
+            .where(m.Address.user_id == customer_id)
+            .order_by(m.Address.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "items": [
+            {"id": str(address_id), "label": label, "city": city, "created_at": created.isoformat()}
+            for address_id, label, city, created in rows
+        ],
+        "address_text_and_coordinates": "withheld from the CRM summary",
+    }
+
+
+@router.get("/admin/customers/{customer_id}/referrals", tags=["Customer administration"])
+async def admin_customer_referrals(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=25, ge=1, le=100)
+):
+    await _admin_customer_scope(db, actor, customer_id)
+    referral = F["engagement.referrals"]
+    program = F["engagement.referral_programs"]
+    rows = (
+        await db.execute(
+            select(
+                program.name,
+                referral.status,
+                referral.created_at,
+                referral.referrer_id == customer_id,
+            )
+            .join(program, program.id == referral.program_id)
+            .where(
+                or_(referral.referrer_id == customer_id, referral.referred_user_id == customer_id)
+            )
+            .order_by(referral.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "items": [
+            {
+                "program": name,
+                "status": status,
+                "direction": "referred" if is_referrer else "invited",
+                "created_at": created.isoformat(),
+            }
+            for name, status, created, is_referrer in rows
+        ]
+    }
+
+
+@router.get("/admin/customers/{customer_id}/campaigns", tags=["Customer administration"])
+async def admin_customer_campaigns(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=25, ge=1, le=100)
+):
+    await _admin_customer_scope(db, actor, customer_id)
+    redemption = F["engagement.coupon_redemptions"]
+    coupon = F["engagement.coupons"]
+    campaign = F["engagement.promotional_campaigns"]
+    rows = (
+        await db.execute(
+            select(campaign.name, redemption.amount, redemption.created_at)
+            .join(coupon, coupon.id == redemption.coupon_id)
+            .join(campaign, campaign.id == coupon.campaign_id)
+            .where(redemption.user_id == customer_id)
+            .order_by(redemption.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "items": [
+            {"campaign": name, "redeemed_amount": str(amount), "created_at": created.isoformat()}
+            for name, amount, created in rows
+        ]
+    }
+
+
+@router.get("/admin/customers/{customer_id}/privacy", tags=["Customer administration"])
+async def admin_customer_privacy(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=50, ge=1, le=100)
+):
+    await _admin_customer_scope(db, actor, customer_id)
+    notification = F["engagement.notification_preferences"]
+    preferences = F["engagement.customer_preferences"]
+    channels = (
+        await db.execute(
+            select(notification.channel, notification.enabled)
+            .where(notification.user_id == customer_id)
+            .limit(limit)
+        )
+    ).all()
+    keys = (
+        await db.scalars(
+            select(preferences.preference_key)
+            .where(preferences.user_id == customer_id)
+            .limit(limit)
+        )
+    ).all()
+    consent_events = (
+        await db.scalars(
+            select(m.CustomerConsentEvent)
+            .where(m.CustomerConsentEvent.user_id == customer_id)
+            .order_by(m.CustomerConsentEvent.created_at.desc(), m.CustomerConsentEvent.id.desc())
+            .limit(limit)
+        )
+    ).all()
+    latest_consents = {}
+    for event_row in consent_events:
+        latest_consents.setdefault(
+            (event_row.purpose, event_row.channel),
+            {
+                "purpose": event_row.purpose,
+                "channel": event_row.channel,
+                "enabled": event_row.enabled,
+                "policy_version": event_row.policy_version,
+                "recorded_at": event_row.created_at.isoformat(),
+            },
+        )
+    return {
+        "notification_preferences": [
+            {"channel": channel, "enabled": enabled} for channel, enabled in channels
+        ],
+        "preference_keys": list(keys),
+        "marketing_consent_evidence": list(latest_consents.values()),
+        "notice": (
+            "Only explicit customer-authored ledger events are consent evidence; "
+            "notification preferences are shown separately."
+        ),
+    }
+
+
+@router.get("/admin/customers/{customer_id}/security", tags=["Customer administration"])
+async def admin_customer_security(
+    customer_id: UUID, actor: Actor, db: DB, limit: int = Query(default=25, ge=1, le=100)
+):
+    await _admin_customer_scope(db, actor, customer_id)
+    authentication_event = F["identity.authentication_events"]
+    rows = (
+        await db.execute(
+            select(authentication_event.event_type, authentication_event.created_at)
+            .where(authentication_event.user_id == customer_id)
+            .order_by(authentication_event.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    sessions = await db.scalar(
+        select(func.count(m.Session.id)).where(
+            m.Session.user_id == customer_id,
+            m.Session.revoked_at.is_(None),
+            m.Session.expires_at > now(),
+        )
+    )
+    return {
+        "active_session_count": int(sessions or 0),
+        "events": [
+            {"type": event_type, "created_at": created.isoformat()} for event_type, created in rows
+        ],
+    }
+
+
+@router.get("/admin/customers-export", tags=["Customer administration"])
+async def admin_customer_export(
+    request: Request,
+    actor: Actor,
+    db: DB,
+    city_id: UUID,
+    purpose: str = Query(
+        default="customer_directory",
+        pattern="^(customer_directory|support_followup|retention_review)$",
+    ),
+    limit: int = Query(default=500, ge=1, le=500),
+):
+    global_access, organization_ids, city_ids = await customer_admin.customer_scope(db, actor)
+    if not global_access and city_id not in city_ids and not organization_ids:
+        raise BusinessError("forbidden", "City is outside customer administration scope", 403)
+    result = await customer_admin.list_customers(
+        db,
+        global_access=global_access,
+        organization_ids=organization_ids,
+        city_ids=city_ids,
+        city_id=city_id,
+        limit=limit,
+    )
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "customer_id",
+            "name",
+            "status",
+            "masked_email",
+            "email_verified",
+            "masked_phone",
+            "phone_verified",
+            "order_count",
+            "completed_order_count",
+            "historical_gross_purchase_value",
+            "last_order_at",
+        ]
+    )
+    for row in result["items"]:
+        values = [row["name"] or "", row["status"], row["email"] or "", row["phone"] or ""]
+        safe = ["'" + value if value[:1] in "=+-@" else value for value in values]
+        writer.writerow(
+            [
+                row["id"],
+                safe[0],
+                safe[1],
+                safe[2],
+                row["email_verified"],
+                safe[3],
+                row["phone_verified"],
+                row["order_count"],
+                row["completed_order_count"],
+                row["gross_purchase_value"],
+                row["last_order_at"] or "",
+            ]
+        )
+    exported = len(result["items"])
+    await audit(
+        db,
+        actor,
+        "customer.export",
+        city_id,
+        request.state.request_id,
+        current=f"rows:{exported};purpose:{purpose}",
+        version=1,
+    )
+    stamp = now().strftime("%Y%m%dT%H%M%SZ")
+    return StreamingResponse(
+        iter(["\ufeff" + output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="quickbuddy-customers-{stamp}.csv"',
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+@router.post("/admin/customer-segments/preview", tags=["Customer administration"])
+async def preview_customer_segment(
+    body: s.CustomerSegmentPreviewIn,
+    request: Request,
+    actor: Actor,
+    db: DB,
+):
+    global_access, organization_ids, city_ids = await customer_admin.customer_scope(db, actor)
+    if not global_access and body.city_id not in city_ids and not organization_ids:
+        raise BusinessError("forbidden", "City is outside customer administration scope", 403)
+    result = await customer_admin.preview_segment(
+        db,
+        city_id=body.city_id,
+        global_access=global_access,
+        organization_ids=organization_ids,
+        city_ids=city_ids,
+        logic=body.logic,
+        conditions=body.conditions,
+    )
+    await audit(
+        db,
+        actor,
+        "customer.segment.preview",
+        body.city_id,
+        request.state.request_id,
+        current=f"matches:{result['matched_count']}",
+        version=1,
+    )
+    return result
