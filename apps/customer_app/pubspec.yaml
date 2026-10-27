@@ -5,6 +5,8 @@ publish_to: none
 environment:
   sdk: ">=3.9.0 <4.0.0"
 dependencies:
+  flutter_calling:
+    path: ../../packages/flutter_calling
   flutter:
     sdk: flutter
   flutter_core:
@@ -15,8 +17,12 @@ dependencies:
     path: ../../packages/flutter_networking
   go_router: ^17.0.0
   dio: ^5.8.0
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
   razorpay_flutter: ^1.4.7
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

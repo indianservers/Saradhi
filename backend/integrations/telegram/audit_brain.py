@@ -113,6 +113,7 @@ def evaluate(interpreter, cases=None):
     return {
         "examples": len(rows),
         "independent": True,
+        "raw_exact_match": sum(r["raw"] == r["expected"] for r in rows) / len(rows),
         "exact_match": sum(r["correct"] for r in rows) / len(rows),
         "abstention_rate": sum(r["actual"] == "abstain" for r in rows) / len(rows),
         "results": rows,

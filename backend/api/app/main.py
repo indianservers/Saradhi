@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import logging
 import re
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from time import perf_counter
 from typing import Annotated
 from uuid import UUID, uuid4
@@ -20,6 +20,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from ai_platform.gateway import ModelGateway
 from backend.api.v1.customer_channel import router as customer_channel_router
 from backend.api.v1.routes import router
+from backend.api.v1.voice import expire_signaling
+from backend.api.v1.voice import router as voice_router
 from backend.application import identity as identity_service
 from backend.application.common import now, scoped
 from backend.application.identity import LocalTokenVerifier
@@ -86,10 +88,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if settings.auth_private_key_path
             else OIDCVerifier(settings)
         )
-        yield
-        await app.state.ai_gateway.close()
-        await app.state.redis.aclose()
-        await app.state.engine.dispose()
+        cleanup = asyncio.create_task(expire_signaling(app.state.sessions))
+        try:
+            yield
+        finally:
+            cleanup.cancel()
+            with suppress(asyncio.CancelledError):
+                await cleanup
+            await app.state.ai_gateway.close()
+            await app.state.redis.aclose()
+            await app.state.engine.dispose()
 
     app = FastAPI(
         title="Quickbuddy API",
@@ -347,6 +355,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(router)
     app.include_router(customer_channel_router)
+    app.include_router(voice_router)
 
     @app.websocket("/api/v1/realtime")
     async def realtime(websocket: WebSocket, ticket: str, channel: str):

@@ -36,6 +36,17 @@ if __name__ == "__main__":
         .splitlines()
     ]
     train = [r for r in rows if r["split"] == "train"]
+    focus = os.environ.get("QUICKBUDDY_TRAIN_FOCUS", "all")
+    available_training_examples = len(train)
+    if focus == "v6":
+        recent = [r for r in train if r["family"].startswith("v6_")]
+        old = [r for r in train if not r["family"].startswith("v6_")]
+        old_actions = [r for r in old if r["target"].split("|")[0] != "search"]
+        old_search = sorted(
+            [r for r in old if r["target"].split("|")[0] == "search"],
+            key=lambda r: hashlib.sha256(r["input"].encode()).hexdigest(),
+        )[:700]
+        train = recent + old_actions + old_search
     source = Path(
         os.environ.get("QUICKBUDDY_TRAIN_SOURCE", str(ROOT / ".local/models/flan-t5-small"))
     )
@@ -88,7 +99,9 @@ if __name__ == "__main__":
         "examples": len(rows),
         "training_examples": len(unique_train),
         "fit_examples_with_replay": len(train),
-        "development_examples": len(rows) - len(unique_train),
+        "development_examples": sum(r["split"] != "train" for r in rows),
+        "available_training_examples": available_training_examples,
+        "training_focus": focus,
         "new_unique_commands": len({r["text"] for r in rows if r["new"]}),
         "new_training_commands": len({r["text"] for r in train if r["new"]}),
         "new_v2_training_commands": len({r["text"] for r in train if r.get("new_v2")}),

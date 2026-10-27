@@ -24,7 +24,9 @@ def test_new_commands_cover_both_categories_and_exclude_audit():
             len({r["text"] for r in new if PRODUCTS.get(r["target"].split("|")[1]) == kind}) >= 200
         )
     inputs = {r["input"] for r in rows}
-    assert all(prompt(text, ctx) not in inputs for ctx, text, _ in CASES)
+    from backend.integrations.telegram.audit_commerce_fresh import CASES as fresh_cases
+
+    assert all(prompt(text, ctx) not in inputs for ctx, text, _ in CASES + fresh_cases)
 
 
 def test_normalization_does_not_cascade_or_inject_food():
@@ -151,3 +153,41 @@ def test_selected_pack_names_keep_product_memory_for_editing():
         {"shopping": {"selection": "demo_market/rice", "quantity": 2}}, {}, load_catalog()
     )
     assert memory.dish == "rice" and memory.quantity == 2 and memory.stage == "customize"
+
+
+def test_new_product_without_count_does_not_reuse_old_pack_suggestion(tmp_path):
+    store = Store(tmp_path / "stale-count.sqlite3")
+    for i, raw in enumerate(
+        ("search|rice|5|500|||show_matches", "search|milk|||||show_matches"), 1
+    ):
+        store.neural = {"plan": parse_plan(raw, 0.99, Memory()).model_dump()}
+        store.process(message(i, "rice 5 packs" if i == 1 else "milk please"))
+    state = json.loads(store.db.execute("SELECT data FROM sessions WHERE chat=42").fetchone()[0])
+    assert "suggested_quantity" not in state
+
+
+def test_stale_product_prediction_requests_confirmation_for_replacement(tmp_path):
+    store = Store(tmp_path / "replace.sqlite3")
+    for index, text in enumerate(("onions 2 packs under 300", "Replace onions with potatoes"), 1):
+        store.neural = {
+            "plan": parse_plan("search|onions|2|300|||show_matches", 0.99, Memory()).model_dump()
+        }
+        reply = store.process(message(index, text))
+    assert "Confirm which product" in reply["text"]
+    assert reply["cards"] and any("potatoes" in c["title"].lower() for c in reply["cards"])
+    assert not store.profile(42).get("basket")
+
+
+def test_arithmetic_error_gets_calculator_confirmation_not_wrong_count(tmp_path):
+    store = Store(tmp_path / "calculator.sqlite3")
+    store.neural = {
+        "plan": parse_plan("search|detergent|2|800|||show_matches", 0.99, Memory()).model_dump()
+    }
+    store.process(message(1, "detergent 2 packs under 800"))
+    store.neural = None
+    reply = store.process(message(2, "double those packs"))
+    assert "2 packs to 4 packs" in reply["text"] and not store.profile(42).get("basket")
+    store.process(message(3, "Confirm packs 4"))
+    state = json.loads(store.db.execute("SELECT data FROM sessions WHERE chat=42").fetchone()[0])
+    assert state["brain_memory"]["quantity"] == 4 and state["suggested_quantity"] == 4
+    assert "expired" in store.process(message(4, "Confirm packs 8"))["text"]

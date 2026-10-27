@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { isSameOrigin } from "./request-origin";
 
 const uuid = "[0-9a-fA-F-]{36}";
 const readRoutes = [
@@ -45,7 +46,7 @@ function responseError(message: string, status: number) {
 }
 
 function sameOrigin(request: Request) {
-  return request.headers.get("origin") === new URL(request.url).origin;
+  return isSameOrigin(request);
 }
 
 function apiBase() {
@@ -115,6 +116,7 @@ export async function backendProxy(request: Request, path: string[]) {
       headers,
       body,
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
     if (response.status === 401) {
       const refreshToken = jar.get("qb_refresh")?.value;
@@ -129,6 +131,7 @@ export async function backendProxy(request: Request, path: string[]) {
             },
             body: JSON.stringify({ refresh_token: refreshToken }),
             cache: "no-store",
+            signal: AbortSignal.timeout(10_000),
           },
         );
         if (refreshed.ok) {
@@ -163,6 +166,7 @@ export async function backendProxy(request: Request, path: string[]) {
               headers,
               body,
               cache: "no-store",
+              signal: AbortSignal.timeout(10_000),
             });
           }
         } else {
@@ -232,6 +236,7 @@ export async function sessionRoute(request: Request) {
         },
         body: JSON.stringify(credentials),
         cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
       });
       if (!upstream.ok)
         return new Response(upstream.body, {
@@ -288,6 +293,7 @@ export async function sessionRoute(request: Request) {
           },
           body: JSON.stringify({ refresh_token: refresh }),
           cache: "no-store",
+          signal: AbortSignal.timeout(10_000),
         });
       } catch {
         /* Always clear the local session, including during an outage. */

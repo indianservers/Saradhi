@@ -53,6 +53,51 @@ class Shopping:
                 result["action"] = f"Pick {restaurant.id}/{dish.id}"
             return result
 
+        from backend.integrations.telegram.commerce_nlp_data import quantity_adjustment
+        from backend.integrations.telegram.dialogue_brain import Memory, Plan, context_for
+
+        current_memory = context_for(state, profile, self.catalog)
+        pending = state.get("pending_pack_change")
+        if text.startswith("Confirm packs "):
+            state.pop("pending_pack_change", None)
+            if (
+                not pending
+                or text != f"Confirm packs {pending['quantity']}"
+                or current_memory.model_dump() != pending["memory"]
+            ):
+                return view("That quantity review expired or the selection changed. Ask again.")
+            args = Memory.model_validate(pending["memory"]).model_dump()
+            args["quantity"] = pending["quantity"]
+            confirmed = Plan(
+                **args,
+                action="search",
+                step="show_matches",
+                confidence=1,
+                source="confirmed_quantity_calculator",
+            )
+            self.store.neural = {
+                **(getattr(self.store, "neural", None) or {}),
+                "plan": confirmed.model_dump(),
+            }
+        else:
+            expected = quantity_adjustment(text, current_memory)
+            proposal = (getattr(self.store, "neural", None) or {}).get("plan") or {}
+            if expected and proposal.get("quantity") != expected:
+                if draft or state.get("edit_line"):
+                    button = f"Qty {expected}" if draft else f"Set quantity {expected}"
+                else:
+                    state["pending_pack_change"] = {
+                        "quantity": expected,
+                        "memory": current_memory.model_dump(),
+                    }
+                    button = f"Confirm packs {expected}"
+                return view(
+                    f"For {current_memory.dish}, that changes {current_memory.quantity} packs "
+                    f"to {expected} packs. Confirm the quantity?",
+                    (button, "Cart"),
+                )
+            state.pop("pending_pack_change", None)
+
         if text == "Languages":
             return view("Choose language / భాష ఎంచుకోండి / भाषा चुनें", ("English", "తెలుగు", "हिन्दी"))
         if text in ("English", "తెలుగు", "हिन्दी"):
@@ -96,6 +141,9 @@ class Shopping:
         if text in ("Food", "Groceries", "Essentials", "All items"):
             state.pop("step", None)
             state["screen"] = "browse"
+            state.pop("brain_memory", None)
+            state.pop("search_query", None)
+            state.pop("suggested_quantity", None)
             state["browse_kind"] = {
                 "Food": "food",
                 "Groceries": "groceries",
@@ -600,6 +648,30 @@ class Shopping:
                     messages.get(plan.step, "Choose an option and I will help you review it.")
                 )
             if plan.action == "search":
+                from backend.integrations.telegram.commerce_nlp_data import product_mentions
+
+                previous_item = state.get("brain_memory", {}).get("dish", "")
+                other_items = [name for name in product_mentions(text) if name != previous_item]
+                if (
+                    previous_item
+                    and plan.dish == previous_item
+                    and len(other_items) == 1
+                    and re.search(r"\b(replace|instead|switch|meant|remove|stop)\b", text, re.I)
+                ):
+                    name = other_items[0]
+                    state["suggested_quantity"] = plan.quantity or 1
+                    choices = matches(self.catalog, name) + matches(self.catalog, previous_item)
+                    seen = set()
+                    unique_choices = []
+                    for r, d in choices:
+                        if (r.id, d.id) not in seen:
+                            unique_choices.append((r, d))
+                            seen.add((r.id, d.id))
+                    return view(
+                        "You mentioned more than one product. "
+                        "Confirm which product you want to use.",
+                        cards=[item_card(r, d) for r, d in unique_choices],
+                    )
                 state["screen"] = "search"
                 direct_query = fuzzy_query(text.lower(), self.catalog)
                 dish_words = {
@@ -623,6 +695,8 @@ class Shopping:
                     if key in ("dish", "quantity", "budget", "diet", "sort", "stage")
                 }
                 state["brain_memory"]["stage"] = "search"
+                if plan.quantity is None:
+                    state.pop("suggested_quantity", None)
                 parsed = {
                     "intent": "search",
                     "query": search_query(plan),
@@ -790,8 +864,8 @@ class Shopping:
                 )
             if neural.get("plan"):
                 return view(
-                    "No available menu items match those requirements. "
-                    "Change a filter or browse restaurants.",
+                    "No available products match those requirements. "
+                    "Change a filter or browse stores and restaurants.",
                     ("Restaurants", "Cart"),
                 )
         return None

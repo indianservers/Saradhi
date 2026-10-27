@@ -1095,6 +1095,13 @@ async def price(branch_id: UUID, body: s.PriceIn, actor: Actor, db: DB):
         overlaps = overlaps.where(m.Price.starts_at < body.ends_at)
     if await db.scalar(overlaps):
         raise BusinessError("overlapping_price", "Price period overlaps an existing branch price")
+    # Register an empty balance so a newly priced variant is reachable from the
+    # inventory screen. This does not grant stock or make the product sellable.
+    await db.execute(
+        insert(m.Stock)
+        .values(branch_id=branch_id, variant_id=body.variant_id, on_hand=0, reserved=0, version=1)
+        .on_conflict_do_nothing(index_elements=["branch_id", "variant_id"])
+    )
     return await add(db, m.Price, branch_id=branch_id, **body.model_dump())
 
 
@@ -1684,6 +1691,16 @@ async def reorder_lines(order_id: UUID, actor: Actor, db: DB):
     ]
 
 
+def merchant_queue_item(item):
+    snapshot = item.snapshot or {}
+    return s.MerchantQueueItem.model_validate(item, from_attributes=True).model_copy(
+        update={
+            "preparation_notes": snapshot.get("preparation_notes", ""),
+            "addons": snapshot.get("addons", []),
+        }
+    )
+
+
 @router.get(
     "/merchant/branches/{branch_id}/orders",
     response_model=s.MerchantQueuePage,
@@ -1716,16 +1733,7 @@ async def merchant_order_queue(
     )
     items_by_order: dict[UUID, list[s.MerchantQueueItem]] = {}
     for item in item_rows:
-        items_by_order.setdefault(item.merchant_order_id, []).append(
-            s.MerchantQueueItem(
-                product_name=item.product_name,
-                variant_name=item.variant_name,
-                quantity=item.quantity,
-                unit=item.unit,
-                unit_price=item.unit_price,
-                total=item.total,
-            )
-        )
+        items_by_order.setdefault(item.merchant_order_id, []).append(merchant_queue_item(item))
     return {
         "items": [
             s.MerchantQueueOut.model_validate(child).model_copy(
@@ -1736,6 +1744,49 @@ async def merchant_order_queue(
         "next_cursor": base64.urlsafe_b64encode(next_id.bytes).decode().rstrip("=")
         if next_id
         else None,
+    }
+
+
+@router.get("/merchant/branches/{branch_id}/orders/{child_id}", tags=["Merchant workspace"])
+async def merchant_order_detail(branch_id: UUID, child_id: UUID, actor: Actor, db: DB):
+    await branch_scope(db, actor, branch_id, "merchant.write")
+    child = await db.scalar(
+        select(m.MerchantOrder).where(
+            m.MerchantOrder.id == child_id, m.MerchantOrder.branch_id == branch_id
+        )
+    )
+    if child is None:
+        raise BusinessError("not_found", "Order not found in this branch", 404)
+    item_rows = (
+        await db.scalars(
+            select(m.OrderItem)
+            .where(m.OrderItem.merchant_order_id == child.id)
+            .order_by(m.OrderItem.created_at, m.OrderItem.id)
+        )
+    ).all()
+    order = await Repository(db).require(m.Order, child.order_id)
+    Profile = F["identity.user_profiles"]
+    profile = await db.scalar(select(Profile).where(Profile.user_id == order.user_id))
+    units = (
+        await db.scalars(
+            select(m.FulfillmentUnit).where(m.FulfillmentUnit.merchant_order_id == child.id)
+        )
+    ).all()
+    # Fulfillment context only, restricted to the merchant's own order.
+    return {
+        **s.MerchantQueueOut.model_validate(child).model_dump(),
+        "items": [merchant_queue_item(item) for item in item_rows],
+        "customer": {"display_name": profile.display_name if profile else "Customer"},
+        "fulfillment": [
+            {
+                "delivery_method": unit.delivery_method,
+                "address": unit.address_snapshot
+                if unit.delivery_method == "merchant_delivery"
+                and child.status not in {"fulfilled", "rejected", "cancelled"}
+                else None,
+            }
+            for unit in units
+        ],
     }
 
 
@@ -2665,29 +2716,45 @@ async def order_tracking(order_id: UUID, actor: Actor, request: Request, db: DB)
             .order_by(m.DeliveryTask.id)
         )
     ).all()
+    task_ids = [task.id for task, _, _ in tasks]
+    # One joined read instead of two round trips for every merchant delivery.
+    live_locations = (
+        (
+            await db.execute(
+                select(m.Assignment.task_id, m.LatestLocation)
+                .join(m.Pilot, m.Pilot.id == m.Assignment.pilot_id)
+                .join(m.User, m.User.id == m.Pilot.user_id)
+                .join(m.LatestLocation, m.LatestLocation.pilot_id == m.Pilot.id)
+                .where(
+                    m.Assignment.task_id.in_(task_ids),
+                    m.Assignment.status.in_(["accepted", "picked_up"]),
+                    m.Pilot.location_consent_at.is_not(None),
+                    m.Pilot.verified.is_(True),
+                    m.Pilot.state.not_in(["offline", "suspended"]),
+                    m.User.status == "active",
+                    m.LatestLocation.observed_at
+                    >= now()
+                    - timedelta(seconds=request.app.state.settings.pilot_location_fresh_seconds),
+                )
+            )
+        ).all()
+        if task_ids
+        else []
+    )
+    locations_by_task = {task_id: latest for task_id, latest in live_locations}
     items = []
     for task, unit, child in tasks:
-        assignment = await db.scalar(
-            select(m.Assignment)
-            .where(
-                m.Assignment.task_id == task.id, m.Assignment.status.in_(["accepted", "picked_up"])
-            )
-            .order_by(m.Assignment.created_at.desc())
-            .limit(1)
-        )
+        latest = locations_by_task.get(task.id)
         location = None
-        if assignment and task.status in {"assigned", "picked_up"}:
-            latest = await db.scalar(
-                select(m.LatestLocation).where(m.LatestLocation.pilot_id == assignment.pilot_id)
-            )
-            if latest and latest.observed_at >= now() - timedelta(
-                seconds=request.app.state.settings.pilot_location_fresh_seconds
-            ):
-                location = {
-                    "latitude": str(latest.latitude),
-                    "longitude": str(latest.longitude),
-                    "observed_at": latest.observed_at,
-                }
+        if latest and task.status in {"assigned", "picked_up"}:
+            location = {
+                "latitude": str(latest.latitude),
+                "longitude": str(latest.longitude),
+                "observed_at": latest.observed_at,
+                "accuracy_m": str(latest.accuracy_m),
+                "valid_until": latest.observed_at
+                + timedelta(seconds=request.app.state.settings.pilot_location_fresh_seconds),
+            }
         items.append(
             {
                 "delivery_id": str(task.id),

@@ -119,7 +119,10 @@ function useLive<T>(path: string | null): Result<T> {
       return;
     }
     const controller = new AbortController();
+    let inFlight = false;
     const run = async () => {
+      if (inFlight || controller.signal.aborted) return;
+      inFlight = true;
       try {
         const response = await fetch(`/api/backend/${path}`, {
           cache: "no-store",
@@ -127,7 +130,11 @@ function useLive<T>(path: string | null): Result<T> {
         });
         const body = await response.json().catch(() => ({}));
         if (!response.ok)
-          throw new Error(body.detail ?? `Backend returned ${response.status}`);
+          throw new Error(
+            body.error?.message ??
+              body.detail ??
+              `Backend returned ${response.status}`,
+          );
         if (!controller.signal.aborted) {
           setData(body as T);
           setError("");
@@ -141,11 +148,17 @@ function useLive<T>(path: string | null): Result<T> {
           );
           setLoading(false);
         }
+      } finally {
+        inFlight = false;
       }
     };
+    setData(null);
+    setError("");
     setLoading(true);
     void run();
-    const timer = window.setInterval(() => void run(), 30_000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void run();
+    }, 30_000);
     return () => {
       controller.abort();
       window.clearInterval(timer);
@@ -1943,6 +1956,11 @@ export function SupportConsoleWorkspace() {
 
 function CustomerDirectory({ cityId }: { cityId: string }) {
   const [query, setQuery] = useState("");
+  const [settledQuery, setSettledQuery] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettledQuery(query.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
   const [selectedId, setSelectedId] = useState("");
   const [tab, setTab] = useState("overview");
   const [minimumOrders, setMinimumOrders] = useState("1");
@@ -1951,7 +1969,7 @@ function CustomerDirectory({ cityId }: { cityId: string }) {
   const [segmentError, setSegmentError] = useState("");
   const [segmentBusy, setSegmentBusy] = useState(false);
   const path = cityId
-    ? `api/v1/admin/customers?city_id=${cityId}&limit=50${query.trim() ? `&q=${encodeURIComponent(query.trim())}` : ""}`
+    ? `api/v1/admin/customers?city_id=${cityId}&limit=50${settledQuery ? `&q=${encodeURIComponent(settledQuery)}` : ""}`
     : null;
   const customers = useLive<{
     items: CustomerRow[];

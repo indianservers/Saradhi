@@ -2022,6 +2022,9 @@ footer span {
   flex-shrink: 0;
 }
 @media (max-width: 560px) {
+  .qb-admin {
+    flex-direction: column;
+  }
   .qb-admin .qb-sidebar {
     position: static;
     inset: auto;

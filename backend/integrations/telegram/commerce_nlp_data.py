@@ -158,6 +158,98 @@ def add_examples(add, target):
             )
         for phrase in (f"Is {item} in stock", f"Which store has {item}"):
             add(phrase, {}, target(dish=item), "v6_availability")
+    for index, item in enumerate(items):
+        replacement = items[(index + 1) % len(items)]
+        for quantity, budget, sort in ((2, 500, ""), (4, 900, "price")):
+            memory = {
+                "dish": item,
+                "quantity": quantity,
+                "budget": budget,
+                "sort": sort,
+                "stage": "search",
+            }
+            for phrase in (
+                f"Remove {item} from my request and search for {replacement}",
+                f"Stop looking for {item}; find {replacement} instead",
+            ):
+                add(
+                    phrase,
+                    memory,
+                    target(dish=replacement, quantity=quantity, budget=budget, sort=sort),
+                    "v6_replace_training",
+                )
+            for phrase, number in (
+                ("Double the pack quantity for me", quantity * 2),
+                ("I would like twice as many of the same item", quantity * 2),
+                ("Halve the quantity of that product", quantity // 2),
+                ("Cut my current pack count in half", quantity // 2),
+            ):
+                add(
+                    phrase,
+                    memory,
+                    target(dish=item, quantity=number, budget=budget, sort=sort),
+                    "v6_arithmetic_training",
+                )
+    for action, phrases in {
+        "groceries": (
+            "Bring up grocery shopping",
+            "Let us browse the grocery aisle",
+            "I am looking for grocery supplies",
+            "Take me to the grocery catalog",
+            "Grocery shopping please",
+            "I would like to browse groceries",
+            "Open groceries for shopping",
+            "Show the available grocery items",
+            "Where is the grocery catalog",
+            "Can we shop for groceries now",
+            "Display grocery supplies",
+            "Let me see grocery choices",
+        ),
+        "essentials": (
+            "Bring up household supplies",
+            "I want to browse essentials",
+            "Can we shop for home essentials",
+            "Take me to cleaning and personal care",
+            "Let us browse household goods",
+            "Household shopping please",
+            "Open essentials for shopping",
+            "Show the essentials catalog",
+            "Display household products",
+            "I am shopping for household needs",
+            "Let me see essential supplies",
+            "Take me to everyday essentials",
+        ),
+        "stores": (
+            "Browse available shops",
+            "I want to explore shops",
+            "Let me see nearby shops",
+            "Take me to store browsing",
+            "List the stores I can shop from",
+            "Open merchant stores",
+            "Which stores are available",
+            "Display the shop list",
+            "Bring up local stores",
+            "Show shops for ordering",
+            "I want to look through stores",
+            "Take me to available shops",
+        ),
+        "browse_all": (
+            "Bring up the entire product catalog",
+            "Show every available item",
+            "Let me explore all categories",
+            "Browse the whole catalog",
+            "Open all shopping products",
+            "Display all available products",
+            "Show every product you have",
+            "I want to browse everything available",
+            "Take me to all items",
+            "Show your full product range",
+            "List products from every category",
+            "Browse food and household products",
+        ),
+    }.items():
+        for phrase in phrases:
+            add(phrase, {}, target(action, step="open_screen"), "v6_navigation_training")
     for action, phrases in {
         "groceries": (
             "show grocery products",
@@ -241,3 +333,37 @@ def canonical_item_name(name):
         if re.search(r"(?<!\w)" + re.escape(item) + r"(?!\w)", normalized):
             return item
     return normalized[:100]
+
+
+def product_mentions(text):
+    import re
+
+    normalized = normalize_product_names(text)
+    pattern = (
+        r"(?<!\w)(?:"
+        + "|".join(re.escape(x) for x in sorted(PRODUCTS, key=len, reverse=True))
+        + r")(?!\w)"
+    )
+    return list(dict.fromkeys(re.findall(pattern, normalized)))
+
+
+def quantity_adjustment(text, memory):
+    """A bounded calculator tool; never changes a cart or selects a product."""
+    import re
+
+    raw = text.lower()
+    if not memory.dish or not memory.quantity:
+        return None
+    if any(p != memory.dish for p in product_mentions(raw)):
+        return None
+    if not re.search(
+        r"\b(packs?|packets?|units?|bottles?|quantity|count|number|those|these|them)\b|as many", raw
+    ):
+        return None
+    if re.search(r"\b(double|doubling|twice)\b", raw):
+        result = memory.quantity * 2
+    elif re.search(r"\b(half|halve|halving)\b", raw) and memory.quantity % 2 == 0:
+        result = memory.quantity // 2
+    else:
+        return None
+    return result if 1 <= result <= 20 else None

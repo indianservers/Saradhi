@@ -436,9 +436,14 @@ def build():
     rows = list(unique.values())
     new_unique = {r["text"].lower() for r in rows if r["new"]}
     assert len(new_unique) >= 200
-    OUTPUT.write_text(
-        "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8"
-    )
+    content = "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n"
+    if not OUTPUT.exists() or OUTPUT.read_text(encoding="utf-8") != content:
+        from uuid import uuid4
+
+        temporary = OUTPUT.with_name(OUTPUT.name + f".{uuid4().hex}.tmp")
+        temporary.write_text(content, encoding="utf-8")
+        temporary.replace(OUTPUT)
+
     return rows, len(new_unique)
 
 

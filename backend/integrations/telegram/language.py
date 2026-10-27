@@ -52,6 +52,7 @@ async def enrich(update, store):
                 "Set quantity ",
                 "Link ",
                 "Confirm quote ",
+                "Confirm packs ",
             )
         )
         or text

@@ -107,6 +107,12 @@ if __name__ == "__main__":
     (folder / "commerce-audit.json").write_text(
         json.dumps(commerce_report, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+    from backend.integrations.telegram.audit_commerce_fresh import CASES as novel_cases
+
+    novel_report = evaluate(model, novel_cases)
+    (folder / "commerce-fresh-audit.json").write_text(
+        json.dumps(novel_report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     (folder / "deployment.json").write_text(
         json.dumps(
             {
@@ -124,6 +130,7 @@ if __name__ == "__main__":
                 "development_exact": report["exact_match"],
                 "commerce_development_exact": report["commerce_development_exact"],
                 "commerce_audit_exact": commerce_report["exact_match"],
+                "commerce_fresh_exact": novel_report["exact_match"],
                 "previous_v5_development_exact": report["previous_v5_development_exact"],
                 "previous_v2_development_exact": report["previous_v2_development_exact"],
                 "newest_development_exact": report["newest_development_exact"],

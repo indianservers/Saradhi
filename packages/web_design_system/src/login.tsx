@@ -26,7 +26,11 @@ export function Login({ name }: { name: string }) {
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
         setError(
-          typeof result.detail === "string" ? result.detail : "Sign-in failed.",
+          typeof result.error?.message === "string"
+            ? result.error.message
+            : typeof result.detail === "string"
+              ? result.detail
+              : "Sign-in failed.",
         );
         return;
       }

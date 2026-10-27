@@ -68,6 +68,21 @@ async def test_live_metadata_option_pricing_and_merchant_scope(api):
         f"/api/v1/orders/{order['id']}/merchant-orders", headers=state["customer"]["headers"]
     )
     assert all(row["status"] == "pending" for row in children.json()["items"])
+    child_id = children.json()["items"][0]["id"]
+    for suffix in ["", f"/{child_id}"]:
+        merchant_response = await client.get(
+            f"/api/v1/merchant/branches/{shop['branch']['id']}/orders{suffix}",
+            headers=shop["merchant"]["headers"],
+        )
+        assert merchant_response.status_code == 200, merchant_response.text
+        merchant_body = merchant_response.json()
+        row = (
+            merchant_body
+            if suffix
+            else next(r for r in merchant_body["items"] if r["id"] == child_id)
+        )
+        assert row["items"][0]["preparation_notes"] == "Mild please"
+        assert row["items"][0]["addons"][0]["name"] == "Extra portion"
     async with app.state.sessions.begin() as db:
         await add(
             db,

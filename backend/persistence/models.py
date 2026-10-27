@@ -8,11 +8,13 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Identity,
     Index,
     Integer,
     Numeric,
@@ -945,3 +947,41 @@ class BulkExternalRef(Record, Base):
     entity: Mapped[str] = mapped_column(Text)
     source_key: Mapped[str] = mapped_column(Text)
     record_id: Mapped[UUID] = mapped_column()
+
+
+class VoiceCall(Record, Base):
+    __tablename__ = "voice_calls"
+    __table_args__ = (
+        CheckConstraint("caller_id <> recipient_id", name="different_call_participants"),
+        CheckConstraint(
+            "status IN ('ringing','active','ended','declined','missed')", name="voice_call_status"
+        ),
+        Index("ix_voice_calls_recipient_status", "recipient_id", "status"),
+        Index("ix_voice_calls_caller_status", "caller_id", "status"),
+        {"schema": "fulfillment"},
+    )
+    task_id: Mapped[UUID] = fk("fulfillment.delivery_tasks.id", index=True)
+    assignment_id: Mapped[UUID] = fk("fulfillment.pilot_assignments.id")
+    caller_id: Mapped[UUID] = fk("identity.users.id")
+    recipient_id: Mapped[UUID] = fk("identity.users.id")
+    status: Mapped[str] = mapped_column(Text, default="ringing")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class VoiceSignal(Base):
+    __tablename__ = "voice_call_signals"
+    __table_args__ = (
+        CheckConstraint("kind IN ('offer','answer','ice')", name="voice_signal_kind"),
+        UniqueConstraint("call_id", "client_event_id"),
+        Index("ix_voice_call_signals_call_id_id", "call_id", "id"),
+        {"schema": "fulfillment"},
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    call_id: Mapped[UUID] = fk("fulfillment.voice_calls.id")
+    sender_id: Mapped[UUID] = fk("identity.users.id")
+    client_event_id: Mapped[UUID] = mapped_column()
+    kind: Mapped[str] = mapped_column(Text)
+    payload: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -7,8 +7,8 @@
   "statuses": {
     "201": 100
   },
-  "elapsed_seconds": 3.882,
-  "confirmation_requests_per_second": 25.76,
+  "elapsed_seconds": 3.084,
+  "confirmation_requests_per_second": 32.428,
   "scope": "100 customers, one branch, one shared stock row; no provider, network, GPS or delivery throughput claim",
   "pool_size": 5,
   "max_overflow": 10

@@ -10,7 +10,10 @@ export async function requireRole(role: string | string[]) {
   const base = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
   const api = createApi(base, async () => token);
   try {
-    const { data } = await api.GET("/api/v1/me", { cache: "no-store" });
+    const { data } = await api.GET("/api/v1/me", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
     const allowed = Array.isArray(role) ? role : [role];
     if (data?.roles.some((item) => allowed.includes(item))) return data;
   } catch {

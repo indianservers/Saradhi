@@ -25,7 +25,12 @@ def main():
         auth_private_key_path=".secrets/integration-test-private.pem",
         auth_rate_limit_per_minute=10000,
     )
-    uvicorn.run(create_app(settings), host="127.0.0.1", port=8001, access_log=False)
+    uvicorn.run(
+        create_app(settings),
+        host="127.0.0.1",
+        port=int(os.environ.get("QA_API_PORT", "8001")),
+        access_log=False,
+    )
 
 
 if __name__ == "__main__":

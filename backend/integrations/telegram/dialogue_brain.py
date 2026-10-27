@@ -101,6 +101,9 @@ def parse_plan(raw, confidence, context):
     if len(parts) != 7:
         return None
     action, dish, quantity, budget, diet, sort, step = parts
+    from backend.integrations.telegram.commerce_nlp_data import normalize_product_names
+
+    dish = normalize_product_names(dish)
     try:
         plan = Plan(
             action=action,
@@ -175,9 +178,9 @@ def grounded_plan(plan, text, memory):
         old = getattr(memory, key)
         permitted = set(numbers)
         if key == "quantity" and memory.quantity:
-            if re.search(r"\bdouble\b", normalized):
+            if re.search(r"\b(double|doubling|twice)\b", normalized):
                 permitted.add(str(memory.quantity * 2))
-            if re.search(r"\bhalf\b", normalized) and memory.quantity % 2 == 0:
+            if re.search(r"\b(half|halve|halving)\b", normalized) and memory.quantity % 2 == 0:
                 permitted.add(str(memory.quantity // 2))
         if value is not None and value != old and str(value) not in permitted:
             return None

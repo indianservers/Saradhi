@@ -14,13 +14,14 @@ class LocaleState extends Notifier<Locale> {
 }
 
 class QuickbuddyApp extends ConsumerWidget {
-  const QuickbuddyApp({super.key, required this.title, required this.theme, required this.router});
+  const QuickbuddyApp({super.key, required this.title, required this.theme, required this.router, this.builder});
+  final TransitionBuilder? builder;
   final String title;
   final ThemeData theme;
   final GoRouter router;
   @override
   Widget build(BuildContext context, WidgetRef ref) => MaterialApp.router(
-    title: title, theme: theme, routerConfig: router,
+    title: title, theme: theme, routerConfig: router, builder: builder,
     locale: ref.watch(localeProvider), supportedLocales: const [Locale('en'), Locale('hi')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
   );

@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     access_token_seconds: int = Field(default=900, ge=60, le=3600)
     refresh_token_days: int = Field(default=30, ge=1, le=90)
     sandbox_payments_enabled: bool = False
+    calling_enabled: bool = True
+    call_stun_urls: list[str] = ["stun:stun.l.google.com:19302"]
+    call_turn_urls: list[str] = []
+    call_turn_secret: SecretStr = SecretStr("")
     sandbox_webhook_secret: SecretStr = SecretStr("")
     payment_provider: Literal["razorpay"] = "razorpay"
     razorpay_enabled: bool = False
@@ -68,6 +72,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_config(self):
+        if any(not url.startswith(("stun:", "stuns:")) for url in self.call_stun_urls):
+            raise ValueError("CALL_STUN_URLS requires STUN URLs")
+        if any(not url.startswith(("turn:", "turns:")) for url in self.call_turn_urls):
+            raise ValueError("CALL_TURN_URLS requires TURN URLs")
+        if self.call_turn_urls and len(self.call_turn_secret.get_secret_value()) < 32:
+            raise ValueError("TURN requires CALL_TURN_SECRET of at least 32 characters")
         url = make_url(self.database_url.get_secret_value())
         if url.drivername != "postgresql+asyncpg":
             raise ValueError("DATABASE_URL requires postgresql+asyncpg")

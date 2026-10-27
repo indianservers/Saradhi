@@ -1,0 +1,18 @@
+name: flutter_calling
+description: Private delivery audio calls shared by Quickbuddy clients.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.8.0
+  flutter_networking:
+    path: ../flutter_networking
+  flutter_webrtc: ^1.6.3
+  uuid: ^4.5.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

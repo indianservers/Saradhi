@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math';
+import 'delivery_map.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_calling/flutter_calling.dart';
 import 'package:flutter_core/flutter_core.dart';
 import 'package:flutter_design_system/flutter_design_system.dart';
 import 'package:flutter_networking/flutter_networking.dart';
@@ -10,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 final tokenStore = SecureTokenStore();
+final deliveryCalls = DeliveryCallController(api: createTransport(tokenStore), tokens: tokenStore);
 final transportProvider = Provider((ref) => createTransport(tokenStore));
 final cartIdStore = ValueNotifier<String?>(null);
 final cartCountStore = ValueNotifier<int>(0);
@@ -48,7 +51,8 @@ ThemeData customerTheme() => quickbuddyTheme().copyWith(
 );
 
 void main() => runApp(ProviderScope(child: QuickbuddyApp(
-  title: 'Quickbuddy', theme: customerTheme(), router: router)));
+  title: 'Quickbuddy', theme: customerTheme(), router: router,
+  builder: (context, child) => DeliveryCallOverlay(controller: deliveryCalls, peerLabel: 'Delivery partner', child: child ?? const SizedBox.shrink()))));
 
 class CustomerShell extends StatelessWidget {
   const CustomerShell({super.key, required this.path, required this.child});
@@ -81,6 +85,7 @@ Future<void> _requireSignIn(BuildContext context) async {
 String _message(Object error) {
   if (error is DioException) {
     final data = error.response?.data;
+    if (data is Map && data['error'] is Map && data['error']['message'] is String) return data['error']['message'] as String;
     if (data is Map && data['detail'] is String) return data['detail'] as String;
     if (error.response?.statusCode == 401) return 'Please sign in again to continue.';
     return error.message ?? 'The service is temporarily unavailable.';
@@ -173,8 +178,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final rows = _items((await ref.read(transportProvider).get('/api/v1/addresses?limit=50')).data);
       if (!mounted) return;
       if (rows.isEmpty) { await context.push('/account'); await _loadAddress(); return; }
-      final selected = await showModalBottomSheet<Map<String, dynamic>>(context: context, showDragHandle: true, builder: (ctx) => SafeArea(child: ListView(shrinkWrap: true, padding: const EdgeInsets.all(16), children: [const Text('Deliver to', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)), const SizedBox(height: 8), ...rows.map((a) => ListTile(leading: const Icon(Icons.location_on_outlined), title: Text('${a['label']}'), subtitle: Text('${a['address_text']}'), onTap: () => Navigator.pop(ctx, a))), TextButton.icon(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.add), label: const Text('Manage addresses'))])));
-      if (selected != null) {
+      final selected = await showModalBottomSheet<Map<String, dynamic>>(context: context, useRootNavigator: true, showDragHandle: true, builder: (ctx) => SafeArea(child: ListView(shrinkWrap: true, padding: const EdgeInsets.all(16), children: [const Text('Deliver to', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)), const SizedBox(height: 8), ...rows.map((a) => ListTile(leading: const Icon(Icons.location_on_outlined), title: Text('${a['label']}'), subtitle: Text('${a['address_text']}'), onTap: () => Navigator.pop(ctx, a))), TextButton.icon(onPressed: () => Navigator.pop(ctx, <String, dynamic>{'manage': true}), icon: const Icon(Icons.add), label: const Text('Manage addresses'))])));
+      if (selected?['manage'] == true) {
+        if (!mounted) return;
+        await context.push('/account');
+        await _loadAddress();
+      } else if (selected != null) {
         await tokenStore.writeValue('qb_home_address', selected['id'] as String);
         if (mounted) setState(() => selectedAddress = '${selected['label']} · ${selected['address_text']}');
         unawaited(_loadRecommendations(selected['city_id'].toString()));
@@ -370,7 +379,7 @@ class _BranchScreenState extends ConsumerState<BranchScreen> {
         return;
       }
       if (!mounted) return;
-      final chosen = await showModalBottomSheet<Map<String, dynamic>>(context: context, showDragHandle: true, builder: (ctx) {
+      final chosen = await showModalBottomSheet<Map<String, dynamic>>(context: context, useRootNavigator: true, showDragHandle: true, builder: (ctx) {
         String method = addresses.isNotEmpty && lastMethod == 'courier' ? 'courier' : 'pickup';
         String? addressId = addresses.isEmpty ? null : addresses.firstWhere((a) => a['id'] == lastAddressId, orElse: () => addresses.first)['id'] as String;
         String windowId = windows.firstWhere((w) => w['id'] == lastWindowId, orElse: () => windows.first)['id'] as String;
@@ -469,32 +478,39 @@ class CartScreen extends ConsumerStatefulWidget {
   @override ConsumerState<CartScreen> createState() => _CartScreenState();
 }
 class _CartScreenState extends ConsumerState<CartScreen> {
-  bool loading = true; String? error, cartId; List<Map<String, dynamic>> lines = []; int version = 1;
+  bool loading = true, editing = false; String? error, cartId; List<Map<String, dynamic>> lines = []; int version = 1;
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async {
     if (!await _signedIn()) { if (mounted) setState(() { loading = false; error = 'Sign in to access your saved cart.'; }); return; }
     try {
       final dio = ref.read(transportProvider); cartId = cartIdStore.value ?? await tokenStore.readValue('qb_cart');
       if (cartId == null) { if (mounted) setState(() { loading = false; lines = []; }); return; }
-      final c = await dio.get('/api/v1/carts/$cartId'); version = c.data['version'] as int;
-      final r = await dio.get('/api/v1/carts/$cartId/items?limit=100');
+      final responses = await Future.wait([dio.get('/api/v1/carts/$cartId'), dio.get('/api/v1/carts/$cartId/items?limit=100')]);
+      version = responses[0].data['version'] as int;
+      final r = responses[1];
       final loadedLines = _items(r.data);
       cartCountStore.value = loadedLines.fold<int>(0, (sum, item) => sum + num.parse('${item['quantity']}').ceil());
       if (mounted) setState(() { lines = loadedLines; loading = false; error = null; });
     } catch (e) { if (mounted) setState(() { loading = false; error = _message(e); }); }
   }
   Future<void> _remove(Map<String, dynamic> item) async {
+    if (editing) return;
+    setState(() => editing = true);
     try { await ref.read(transportProvider).delete('/api/v1/carts/$cartId/items/${item['id']}'); await _load(); }
     catch (e) { if (mounted) _snack(context, _message(e)); }
+    finally { if (mounted) setState(() => editing = false); }
   }
   Future<void> _changeQuantity(Map<String, dynamic> item, int delta) async {
+    if (editing) return;
     final next = (num.parse('${item['quantity']}').toDouble() + delta);
     if (next <= 0) { await _remove(item); return; }
+    setState(() => editing = true);
     try {
       final r = await ref.read(transportProvider).patch('/api/v1/carts/$cartId/items/${item['id']}', data: {'quantity': next, 'expected_version': version});
       version = r.data['version'] as int? ?? version + 1;
       await _load();
     } catch (e) { if (mounted) _snack(context, _message(e)); await _load(); }
+    finally { if (mounted) setState(() => editing = false); }
   }
   @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [
     _PageHeader(title: 'Your cart', subtitle: 'Items can come from multiple merchants'),
@@ -508,15 +524,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           leading: const Icon(Icons.shopping_bag_outlined, color: QuickbuddyColors.orange),
           title: Text('${line['product_name'] ?? 'Product'} · ${line['variant_name'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: Text('Qty ${line['quantity']}'),
-          trailing: SizedBox(width: 124, child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            IconButton(tooltip: 'Decrease quantity', onPressed: () => _changeQuantity(line, -1), icon: const Icon(Icons.remove_circle_outline, size: 20)),
-            IconButton(tooltip: 'Increase quantity', onPressed: () => _changeQuantity(line, 1), icon: const Icon(Icons.add_circle_outline, color: QuickbuddyColors.orange, size: 20)),
-            IconButton(tooltip: 'Remove item', onPressed: () => _remove(line), icon: const Icon(Icons.delete_outline, size: 20)),
+          trailing: SizedBox(width: 144, child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            IconButton(tooltip: 'Decrease quantity', onPressed: editing ? null : () => _changeQuantity(line, -1), icon: const Icon(Icons.remove_circle_outline, size: 20)),
+            IconButton(tooltip: 'Increase quantity', onPressed: editing ? null : () => _changeQuantity(line, 1), icon: const Icon(Icons.add_circle_outline, color: QuickbuddyColors.orange, size: 20)),
+            IconButton(tooltip: 'Remove item', onPressed: editing ? null : () => _remove(line), icon: const Icon(Icons.delete_outline, size: 20)),
           ])),
         )).toList(),
       ))),
       const SizedBox(height: 12),
-      QbPrimaryButton(label: 'Review checkout quote', icon: Icons.arrow_forward, onPressed: () => context.push('/checkout/address-payment')),
+      QbPrimaryButton(label: 'Review checkout quote', icon: Icons.arrow_forward, enabled: !editing, onPressed: () => context.push('/checkout/address-payment')),
     ],
     TextButton.icon(onPressed: () => context.go('/restaurants'), icon: const Icon(Icons.add), label: const Text('Browse more merchants')),
   ]);
@@ -559,17 +575,23 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       key ??= _uuidKey();
       await tokenStore.writeValue('qb_idempotency_${q['id']}', key);
       final response = await ref.read(transportProvider).post('/api/v1/orders/confirm', data: {'quote_id': q['id']}, options: Options(headers: {'Idempotency-Key': key}));
-      if (!mounted) return;
       final orderId = response.data['id'] as String;
+      // Confirmation consumes the cart, even when payment still needs recovery.
+      await tokenStore.deleteValue('qb_cart');
+      cartIdStore.value = null;
+      cartCountStore.value = 0;
+      if (!mounted) return;
       if (sandboxAvailable) {
         try {
           final api = ref.read(transportProvider);
           final intent = await api.post('/api/v1/finance/sandbox/payment-intents', data: {'order_id': orderId});
           final completed = await api.post('/api/v1/finance/sandbox/payments/${intent.data['id']}/complete');
+          if (!mounted) return;
           _snack(context, completed.data['status'] == 'confirmed'
             ? 'Order placed and sandbox payment confirmed. No real money was charged.'
             : 'Order placed. Sandbox payment status: ${completed.data['status']}.');
         } catch (e) {
+          if (!mounted) return;
           _snack(context, 'Order placed; sandbox payment did not complete: ${_message(e)}');
         }
       } else if (onlineEnabled) {
@@ -586,6 +608,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         _openRazorpay(payment.data);
         return;
       }
+      if (!mounted) return;
       context.go('/orders/$orderId/complete');
     } catch (e) { if (mounted) { setState(() => submitting = false); _snack(context, 'Order was not confirmed: ${_message(e)}. Retry safely with the same checkout.'); } }
   }
@@ -692,6 +715,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       final items = _items((await api.get('/api/v1/orders/$orderId/reviewable-items?limit=100')).data);
       var submitted = 0;
       for (final item in items.where((row) => row['rating'] == null)) {
+        if (!mounted) return;
         var rating = 0;
         final selected = await showDialog<int>(context: context, builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, update) => AlertDialog(
@@ -733,10 +757,12 @@ class TrackingScreen extends ConsumerStatefulWidget {
   const TrackingScreen({super.key, required this.orderId}); final String orderId;
   @override ConsumerState<TrackingScreen> createState() => _TrackingScreenState();
 }
-class _TrackingScreenState extends ConsumerState<TrackingScreen> {
+class _TrackingScreenState extends ConsumerState<TrackingScreen> with WidgetsBindingObserver {
+  bool foreground = true;
+  @override void didChangeAppLifecycleState(AppLifecycleState state) { foreground = state == AppLifecycleState.resumed; if (foreground) _load(); }
   Timer? timer; bool loading = true, polling = false; String? error; Map<String, dynamic>? tracking;
-  @override void initState() { super.initState(); _load(); timer = Timer.periodic(const Duration(seconds: 15), (_) => _load()); }
-  @override void dispose() { timer?.cancel(); super.dispose(); }
+  @override void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); _load(); timer = Timer.periodic(const Duration(seconds: 5), (_) { if (foreground) _load(); }); }
+  @override void dispose() { timer?.cancel(); WidgetsBinding.instance.removeObserver(this); super.dispose(); }
   Future<void> _load() async {
     if (polling) return;
     polling = true;
@@ -751,14 +777,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     if (loading) const Center(child: CircularProgressIndicator()) else if (error != null) _InfoCard(text: error!, action: TextButton(onPressed: _load, child: const Text('Reconnect'))),
     if (tracking != null) ...[
       if (error != null) const QbStatusChip('Showing last known snapshot', tone: 'warning'),
-      Container(height: 150, margin: const EdgeInsets.only(bottom: 10), decoration: BoxDecoration(color: const Color(0xFFF0F1F6), borderRadius: BorderRadius.circular(14), border: Border.all(color: QuickbuddyColors.line)), child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.map_outlined, color: QuickbuddyColors.muted, size: 30), SizedBox(height: 6), Text('Map provider unavailable', style: TextStyle(fontWeight: FontWeight.w700)), Text('No route or rider movement is simulated.', style: TextStyle(fontSize: 10, color: QuickbuddyColors.muted))])),
-      if (tracking!['deliveries'] is List) ...(tracking!['deliveries'] as List).whereType<Map>().map((d) => Card(child: ListTile(leading: const Icon(Icons.local_shipping_outlined, color: QuickbuddyColors.violet), title: Text('Delivery · ${d['status']}'), subtitle: Text('${d['delivery_method']}${d['pilot_location'] == null ? ' · Location unavailable' : ' · Updated ${d['pilot_location']['observed_at']}'}'), trailing: const Icon(Icons.chevron_right)))) ,
+      if (tracking!['deliveries'] is List) ...(tracking!['deliveries'] as List).whereType<Map>().map((d) => Card(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [if (d['pilot_location'] is Map) DeliveryPartnerMap(location: Map<String, dynamic>.from(d['pilot_location'])), ListTile(leading: const Icon(Icons.local_shipping_outlined, color: QuickbuddyColors.violet), title: Text('Delivery · ${d['status']}'), subtitle: Text('${d['delivery_method']}${d['pilot_location'] == null ? ' · Location unavailable' : ' · Updated ${d['pilot_location']['observed_at']}'}')), if (const {'assigned', 'picked_up'}.contains(d['status'])) Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), child: DeliveryCallButton(controller: deliveryCalls, deliveryId: '${d['delivery_id']}', label: 'Call delivery partner'))]))),
       Text('Snapshot refreshed ${tracking!['generated_at'] ?? ''}', style: const TextStyle(fontSize: 10, color: QuickbuddyColors.muted)),
       const SizedBox(height: 6),
-      const QbPreviewNotice(message: 'The authorized snapshot refreshes every 15 seconds. WebSocket, map tiles, ETA and route are not configured; pilot location appears only when returned as fresh by the backend.'),
+      const QbPreviewNotice(message: 'Live location refreshes every 5 seconds while this screen is open. Only fresh, consented partner positions are shown. No route or ETA is estimated.'),
     ],
   ]);
 }
+
 
 class OrderScreen extends ConsumerStatefulWidget {
   const OrderScreen({super.key, required this.orderId}); final String orderId;
@@ -822,13 +848,14 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async { signedIn = await _signedIn(); if (!signedIn) { if (mounted) setState(() { loading = false; }); return; } try { final api = ref.read(transportProvider); final results = await Future.wait([api.get('/api/v1/addresses?limit=50'), api.get('/api/v1/me/support/tickets?limit=50')]); if (mounted) setState(() { addresses = _items(results[0].data); tickets = _items(results[1].data); loading = false; error = null; }); } catch (e) { if (mounted) setState(() { loading = false; error = _message(e); }); } }
   Future<void> _signOut() async {
+    await deliveryCalls.hangUp();
     try {
       final refresh = await tokenStore.refreshToken();
       if (refresh != null) await ref.read(transportProvider).post('/api/v1/auth/logout', data: {'refresh_token': refresh});
     } catch (_) {
       // Local credentials are always cleared even if revocation cannot reach the server.
     }
-    await tokenStore.clear(); await tokenStore.deleteValue('qb_cart'); cartIdStore.value = null;
+    await tokenStore.clear(); await tokenStore.deleteValue('qb_cart'); cartIdStore.value = null; cartCountStore.value = 0;
     if (mounted) setState(() { signedIn = false; addresses = []; tickets = []; });
   }
   @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [const _PageHeader(title: 'Account', subtitle: 'Profile, addresses and help'), if (loading) const Center(child: CircularProgressIndicator()) else if (!signedIn) ...[const _InfoCard(text: 'Sign in with email and password to access your account.'), QbPrimaryButton(label: 'Sign in / create account', onPressed: () async { await context.push('/sign-in'); _load(); })] else ...[
@@ -892,6 +919,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final dio = ref.read(transportProvider);
     try {
       final cities = _items((await dio.get('/api/v1/geo/cities?limit=100')).data);
+      if (!context.mounted) return;
       if (cities.isEmpty) { if (context.mounted) _snack(context, 'No active cities are configured.'); return; }
       final label = TextEditingController();
       final text = TextEditingController();
@@ -973,6 +1001,6 @@ class OnboardingScreen extends StatelessWidget {
   ]);
 }
 
-class _PageHeader extends StatelessWidget { const _PageHeader({required this.title, required this.subtitle}); final String title, subtitle; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: QuickbuddyColors.ink)), const SizedBox(height: 4), Text(subtitle, style: const TextStyle(fontSize: 12, color: QuickbuddyColors.muted))])); }
+class _PageHeader extends StatelessWidget { const _PageHeader({required this.title, required this.subtitle, this.action}); final String title, subtitle; final Widget? action; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Expanded(child: Text(title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: QuickbuddyColors.ink))), if (action != null) action!]), const SizedBox(height: 4), Text(subtitle, style: const TextStyle(fontSize: 12, color: QuickbuddyColors.muted))])); }
 class _InfoCard extends StatelessWidget { const _InfoCard({required this.text, this.action}); final String text; final Widget? action; @override Widget build(BuildContext context) => QbPanel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(text, style: const TextStyle(fontSize: 12, height: 1.45)), if (action != null) Align(alignment: Alignment.centerRight, child: action!)])); }
 class _PriceLine extends StatelessWidget { const _PriceLine(this.label, this.value, {this.bold = false}); final String label, value; final bool bold; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(children: [Expanded(child: Text(label, style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.normal))), Text(value, style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w600))])); }

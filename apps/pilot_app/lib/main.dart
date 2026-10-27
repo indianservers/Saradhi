@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'location_sender.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_calling/flutter_calling.dart';
 import 'package:flutter_core/flutter_core.dart';
 import 'package:flutter_design_system/flutter_design_system.dart';
 import 'package:flutter_networking/flutter_networking.dart';
@@ -11,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 const previewMode = String.fromEnvironment('APP_ENV', defaultValue: 'development') != 'production';
 final pilotTokenStore = SecureTokenStore();
+final deliveryCalls = DeliveryCallController(api: createTransport(pilotTokenStore), tokens: pilotTokenStore);
 final transportProvider = Provider((ref) => createTransport(pilotTokenStore));
 final pilotProfileStore = ValueNotifier<Map<String, dynamic>?>(null);
 final pilotLocationReporter = PilotLocationReporter();
@@ -34,6 +37,7 @@ final router = GoRouter(initialLocation: '/login', routes: [
 
 void main() => runApp(ProviderScope(child: QuickbuddyApp(
   title: 'Quickbuddy Pilot', theme: quickbuddyTheme(), router: router,
+  builder: (context, child) => DeliveryCallOverlay(controller: deliveryCalls, peerLabel: 'Customer', child: child ?? const SizedBox.shrink()),
 )));
 
 List<Map<String, dynamic>> _rows(dynamic response) {
@@ -59,6 +63,8 @@ void _toast(BuildContext context, String message) => ScaffoldMessenger.of(contex
 
 class PilotLocationReporter with WidgetsBindingObserver {
   StreamSubscription<Position>? _subscription;
+  Timer? _heartbeat;
+  bool _refreshing = false;
   bool _sending = false;
   bool _started = false;
   bool _foreground = true;
@@ -85,14 +91,15 @@ class PilotLocationReporter with WidgetsBindingObserver {
     }
     _api = api;
     _foreground = true;
-    WidgetsBinding.instance.addObserver(this);
     final first = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 20)),
     );
     await _send(api, first);
+    WidgetsBinding.instance.addObserver(this);
     _started = true;
     _activeWork = activeWork;
     _listen(api);
+    _heartbeat = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(_refresh()));
   }
 
   void _listen(Dio api) {
@@ -101,7 +108,9 @@ class PilotLocationReporter with WidgetsBindingObserver {
         accuracy: _activeWork ? LocationAccuracy.high : LocationAccuracy.medium,
         distanceFilter: _activeWork ? 25 : 100,
       ),
-    ).listen((position) => unawaited(_send(api, position)));
+    ).listen((position) => unawaited(_send(api, position)), onError: (Object error) {
+      lastError = 'Location updates stopped: ${_error(error)}';
+    });
   }
 
   Future<void> _send(Dio api, Position position) async {
@@ -113,23 +122,19 @@ class PilotLocationReporter with WidgetsBindingObserver {
     if (_sending) return;
     _sending = true;
     try {
-      final previous = int.tryParse(await pilotTokenStore.readValue('pilot_location_sequence') ?? '') ?? 0;
-      final sequence = previous + 1;
-      final result = await api.post('/api/v1/pilots/me/location', data: {
+      final result = await uploadPilotPosition(api, pilotTokenStore, {
         'latitude': position.latitude.toStringAsFixed(7),
         'longitude': position.longitude.toStringAsFixed(7),
         'observed_at': position.timestamp.toUtc().toIso8601String(),
         'accuracy_m': position.accuracy.toStringAsFixed(2),
         'heading_degrees': position.heading >= 0 ? position.heading.toStringAsFixed(2) : null,
         'speed_mps': position.speed >= 0 ? position.speed.toStringAsFixed(2) : null,
-        'client_sequence': sequence,
         'app_state': 'foreground',
       });
-      if (result.data is Map && result.data['accepted'] == true) {
-        await pilotTokenStore.writeValue('pilot_location_sequence', '$sequence');
+      if (result['accepted'] == true) {
         lastError = null;
       } else {
-        lastError = 'The backend ignored an out-of-order or low-quality location sample.';
+        lastError = 'Waiting for a fresh, accurate GPS reading.';
       }
     } catch (e) {
       lastError = _error(e);
@@ -139,6 +144,8 @@ class PilotLocationReporter with WidgetsBindingObserver {
   }
 
   Future<void> stop() async {
+    _heartbeat?.cancel();
+    _heartbeat = null;
     await _subscription?.cancel();
     _subscription = null;
     _started = false;
@@ -147,21 +154,26 @@ class PilotLocationReporter with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
   }
 
+  Future<void> _refresh() async {
+    final api = _api;
+    if (!_foreground || !_started || api == null || _refreshing) return;
+    _refreshing = true;
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 20)),
+      );
+      if (_started && identical(_api, api)) await _send(api, position);
+    } catch (error) { lastError = _error(error); }
+    finally { _refreshing = false; }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
-    final api = _api;
-    if (_foreground && _started && api != null) {
-      unawaited(() async {
-        try {
-          final position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-          );
-          await _send(api, position);
-        } catch (error) { lastError = _error(error); }
-      }());
-    }
+    if (_foreground) unawaited(_refresh());
   }
+
 }
 
 class PilotShell extends StatelessWidget {
@@ -246,7 +258,11 @@ class _PilotLoginScreenState extends ConsumerState<PilotLoginScreen> {
         pilotProfileStore.value = Map<String, dynamic>.from(profile.data);
         if (mounted) context.go('/dashboard');
       } on DioException catch (e) {
-        if (e.response?.statusCode == 403 && mounted) context.go('/setup') else rethrow;
+        if (e.response?.statusCode == 403 && mounted) {
+          context.go('/setup');
+        } else {
+          rethrow;
+        }
       }
     } catch (e) { if (mounted) setState(() => error = _error(e)); }
     finally { if (mounted) setState(() => busy = false); }
@@ -462,6 +478,19 @@ class _PilotRequestScreenState extends ConsumerState<PilotRequestScreen> {
   }
 }
 
+class _AssignmentCard extends StatelessWidget {
+  const _AssignmentCard({required this.assignment, required this.onOpen});
+  final Map<String, dynamic> assignment;
+  final VoidCallback onOpen;
+  @override
+  Widget build(BuildContext context) => Card(child: ListTile(
+    title: Text('Order ${assignment['order_reference']}'),
+    subtitle: Text('${assignment['merchant_name']}'),
+    trailing: QbStatusChip('${assignment['assignment_status']}'.toUpperCase()),
+    onTap: onOpen,
+  ));
+}
+
 class _OfferCard extends StatelessWidget {
   const _OfferCard({required this.assignment, required this.onAccept, required this.onReject});
   final Map<String, dynamic> assignment;
@@ -534,6 +563,7 @@ class _DeliveryCard extends StatelessWidget {
       if (!pickedUp) Text(assignment['merchant_order_status'] == 'ready' ? 'Merchant order is ready for pickup.' : 'Waiting for merchant preparation.', style: const TextStyle(fontSize: 12, color: QuickbuddyColors.muted)),
       const SizedBox(height: 8),
       Wrap(spacing: 8, children: [
+        DeliveryCallButton(controller: deliveryCalls, deliveryId: '${assignment['delivery_task_id']}', label: 'Call customer'),
         OutlinedButton.icon(onPressed: () => _openMaps(pickup['latitude'], pickup['longitude']), icon: const Icon(Icons.navigation), label: const Text('Navigate to pickup')),
         if (!pickedUp) FilledButton.icon(onPressed: assignment['merchant_order_status'] == 'ready' ? onPickup : null, icon: const Icon(Icons.inventory_2_outlined), label: const Text('Confirm pickup')),
         if (pickedUp) OutlinedButton.icon(onPressed: () => context.go('/incident'), icon: const Icon(Icons.report_problem_outlined), label: const Text('Delivery issue')),
@@ -901,13 +931,36 @@ class PilotProfileScreen extends ConsumerStatefulWidget {
 
 class _PilotProfileScreenState extends ConsumerState<PilotProfileScreen> {
   Map<String, dynamic>? profile;
-  bool loading = true;
+  bool loading = true, revoking = false;
+  String? error;
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async {
-    try { final r = await ref.read(transportProvider).get('/api/v1/pilots/me'); if (mounted) setState(() { profile = Map<String, dynamic>.from(r.data); loading = false; }); }
-    catch (_) { if (mounted) setState(() => loading = false); }
+    try { final r = await ref.read(transportProvider).get('/api/v1/pilots/me'); if (mounted) setState(() { profile = Map<String, dynamic>.from(r.data); loading = false; error = null; }); }
+    catch (e) { if (mounted) setState(() { loading = false; error = _error(e); }); }
+  }
+  Future<void> _stopSharing() async {
+    if (revoking) return;
+    final accepted = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Stop sharing location?'),
+      content: const Text('Device location updates stop and your partner profile goes offline. Customers will no longer see your location.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep sharing')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Stop sharing'))]));
+    if (accepted != true || !mounted) return;
+    setState(() => revoking = true);
+    await pilotLocationReporter.stop();
+    try {
+      await ref.read(transportProvider).post('/api/v1/pilots/me/location-consent', data: {
+        'accepted': false, 'policy_version': 'pilot-location-v1',
+      });
+      await _load();
+      pilotProfileStore.value = profile;
+      if (mounted) _toast(context, 'Location sharing stopped. You are offline.');
+    } catch (e) {
+      if (mounted) _toast(context, 'Device updates stopped. Server confirmation failed: ${_error(e)}');
+    } finally { if (mounted) setState(() => revoking = false); }
   }
   Future<void> _logout() async {
+    await deliveryCalls.hangUp();
     await pilotLocationReporter.stop();
     await pilotTokenStore.clear();
     pilotProfileStore.value = null;
@@ -921,6 +974,9 @@ class _PilotProfileScreenState extends ConsumerState<PilotProfileScreen> {
       title: Text(profile?['verified'] == true ? 'Approved pilot' : 'Approval pending'),
       subtitle: Text('State: ${profile?['state']} · Vehicle: ${profile?['vehicle_type']} · Location consent: ${profile?['location_consent'] == true ? 'on file' : 'not given'}'),
     )),
+    if (error != null) QbPreviewNotice(message: error!),
+    TextButton.icon(onPressed: () async { await Geolocator.openAppSettings(); }, icon: const Icon(Icons.settings_outlined), label: const Text('Location permission settings')),
+    if (profile?['location_consent'] == true) TextButton.icon(onPressed: revoking ? null : _stopSharing, icon: const Icon(Icons.location_off_outlined), label: Text(revoking ? 'Stopping…' : 'Stop location sharing')),
     const QbPreviewNotice(message: 'Identity documents, full KYC status history, vehicle details, emergency contact, bank payout, support tickets and shift scheduling are not writable/readable through current pilot APIs.'),
     TextButton.icon(onPressed: _logout, icon: const Icon(Icons.logout), label: const Text('Sign out')),
   ]);
@@ -941,13 +997,6 @@ class _MetricStrip extends StatelessWidget {
     Text(x.$2, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: QuickbuddyColors.indigo)),
     const SizedBox(height: 3), Text(x.$1, style: const TextStyle(fontSize: 10, color: QuickbuddyColors.muted)),
   ]))).toList());
-}
-
-class _PerkRow extends StatelessWidget {
-  const _PerkRow({required this.icon, required this.title});
-  final IconData icon; final String title;
-  @override
-  Widget build(BuildContext context) => ListTile(dense: true, leading: Icon(icon, color: QuickbuddyColors.orange), title: Text(title));
 }
 
 class _QuickAction extends StatelessWidget {

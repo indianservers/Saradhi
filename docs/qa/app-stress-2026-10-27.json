@@ -1,0 +1,141 @@
+{
+  "scope": "Local ASGI + PostgreSQL; synthetic fixtures; excludes network/carrier capacity",
+  "profiles": [
+    {
+      "concurrency": 1,
+      "journeys": 12,
+      "requests": 108,
+      "failures": [],
+      "route_latency_ms": {
+        "cart_write": {
+          "samples": 36,
+          "p50": 8.98,
+          "p95": 11.54
+        },
+        "cart_read": {
+          "samples": 24,
+          "p50": 8.23,
+          "p95": 10.42
+        },
+        "merchant_queue": {
+          "samples": 12,
+          "p50": 10.24,
+          "p95": 10.7
+        },
+        "catalog": {
+          "samples": 12,
+          "p50": 11.82,
+          "p95": 14.6
+        },
+        "tracking": {
+          "samples": 12,
+          "p50": 10.03,
+          "p95": 18.91
+        },
+        "company_dispatch": {
+          "samples": 12,
+          "p50": 11.78,
+          "p95": 16.01
+        }
+      },
+      "elapsed_seconds": 1.103,
+      "requests_per_second": 97.93,
+      "latency_ms": {
+        "p50": 9.9,
+        "p95": 13.01,
+        "p99": 20.01
+      }
+    },
+    {
+      "concurrency": 10,
+      "journeys": 60,
+      "requests": 540,
+      "failures": [],
+      "route_latency_ms": {
+        "cart_write": {
+          "samples": 180,
+          "p50": 83.26,
+          "p95": 133.99
+        },
+        "cart_read": {
+          "samples": 120,
+          "p50": 76.74,
+          "p95": 100.9
+        },
+        "merchant_queue": {
+          "samples": 60,
+          "p50": 93.63,
+          "p95": 137.85
+        },
+        "catalog": {
+          "samples": 60,
+          "p50": 78.04,
+          "p95": 101.36
+        },
+        "tracking": {
+          "samples": 60,
+          "p50": 81.5,
+          "p95": 105.11
+        },
+        "company_dispatch": {
+          "samples": 60,
+          "p50": 93.61,
+          "p95": 118.54
+        }
+      },
+      "elapsed_seconds": 4.808,
+      "requests_per_second": 112.31,
+      "latency_ms": {
+        "p50": 82.76,
+        "p95": 123.79,
+        "p99": 154.39
+      }
+    },
+    {
+      "concurrency": 30,
+      "journeys": 120,
+      "requests": 1080,
+      "failures": [],
+      "route_latency_ms": {
+        "cart_write": {
+          "samples": 360,
+          "p50": 242.51,
+          "p95": 348.29
+        },
+        "cart_read": {
+          "samples": 240,
+          "p50": 234.4,
+          "p95": 353.24
+        },
+        "merchant_queue": {
+          "samples": 120,
+          "p50": 268.94,
+          "p95": 1707.66
+        },
+        "catalog": {
+          "samples": 120,
+          "p50": 231.61,
+          "p95": 404.06
+        },
+        "tracking": {
+          "samples": 120,
+          "p50": 231.82,
+          "p95": 348.72
+        },
+        "company_dispatch": {
+          "samples": 120,
+          "p50": 262.96,
+          "p95": 376.97
+        }
+      },
+      "elapsed_seconds": 10.703,
+      "requests_per_second": 100.9,
+      "latency_ms": {
+        "p50": 241.22,
+        "p95": 400.93,
+        "p99": 1695.27
+      }
+    }
+  ],
+  "run_context": "Final full Python regression run on local Windows host; ASGI timings exclude network latency."
+}

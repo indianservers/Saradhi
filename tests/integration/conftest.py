@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -77,5 +78,10 @@ async def api(database_url):
     )
     app = create_app(settings)
     async with app.router.lifespan_context(app):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Independent synthetic network identities keep durable per-network budgets
+        # from leaking between otherwise independent tests running on the same DB.
+        network = f"127.77.{uuid4().int % 250}.{uuid4().int % 250 + 1}"
+        async with AsyncClient(
+            transport=ASGITransport(app=app, client=(network, 123)), base_url="http://test"
+        ) as client:
             yield client, app

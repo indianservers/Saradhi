@@ -446,6 +446,8 @@ class MerchantQueueItem(BaseModel):
     unit: str
     unit_price: Decimal
     total: Decimal
+    preparation_notes: str = ""
+    addons: list[dict] = Field(default_factory=list)
 
 
 class MerchantQueueOut(ChildOut):
