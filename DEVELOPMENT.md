@@ -12,6 +12,9 @@ and Node dependencies in npm workspaces. No global installation or cloud provisi
 ./tools/dev.ps1 api
 ```
 
+To populate the isolated development database with synthetic records for the customer, merchant,
+delivery, support, and operations workflows, follow [Local demo data](docs/development/demo-data.md).
+
 The approved isolated cluster reuses the detected PostgreSQL 17.11 binaries and stores data
 inside .local/postgres-data on 127.0.0.1:5433. tools/local-postgres.ps1 reads the detected binary
 path from ignored .local/postgres-toolchain.json. It never changes the unrelated 5432 server.
