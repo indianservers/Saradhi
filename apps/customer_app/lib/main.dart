@@ -686,6 +686,36 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       if (mounted) { _snack(context, 'Added $added previous item${added == 1 ? '' : 's'} to your cart${skipped > 0 ? ' · $skipped skipped' : ''}. Review current prices and slots before ordering.'); context.push('/cart'); }
     } catch (e) { if (mounted) _snack(context, _message(e)); }
   }
+  Future<void> _reviewOrder(String orderId) async {
+    try {
+      final api = ref.read(transportProvider);
+      final items = _items((await api.get('/api/v1/orders/$orderId/reviewable-items?limit=100')).data);
+      var submitted = 0;
+      for (final item in items.where((row) => row['rating'] == null)) {
+        var rating = 0;
+        final selected = await showDialog<int>(context: context, builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, update) => AlertDialog(
+            title: Text('Rate ${item['product_name']}'),
+            content: Row(mainAxisSize: MainAxisSize.min, children: List.generate(5, (index) => IconButton(
+              tooltip: '${index + 1} stars',
+              onPressed: () => update(() => rating = index + 1),
+              icon: Icon(index < rating ? Icons.star : Icons.star_border, color: QuickbuddyColors.orange),
+            ))),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Skip')),
+              FilledButton(onPressed: rating == 0 ? null : () => Navigator.pop(dialogContext, rating), child: const Text('Submit')),
+            ],
+          ),
+        ));
+        if (selected == null) continue;
+        await api.post('/api/v1/order-items/${item['id']}/review', data: {'rating': selected});
+        submitted++;
+      }
+      if (mounted) _snack(context, submitted == 0 ? 'No unrated delivered items.' : 'Thanks for rating $submitted item${submitted == 1 ? '' : 's'}.');
+    } catch (e) {
+      if (mounted) _snack(context, _message(e));
+    }
+  }
   @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [
     const _PageHeader(title: 'Your orders', subtitle: 'Order history from your account'),
     if (loading) const Center(child: CircularProgressIndicator())
@@ -693,6 +723,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     else if (orders.isEmpty) const _InfoCard(text: 'No orders yet. Your confirmed orders will appear here.')
     else ...orders.map((o) => Card(child: Column(children: [
       ListTile(leading: const Icon(Icons.receipt_long, color: QuickbuddyColors.violet), title: Text('Order ${o['id']}'), subtitle: Text('${o['status']} · ${o['currency']} ${o['total']}'), trailing: const Icon(Icons.chevron_right), onTap: () => context.push('/orders/${o['id']}/tracking')),
+      if (o['status'] == 'completed') Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => _reviewOrder(o['id'].toString()), icon: const Icon(Icons.star_outline, size: 17), label: const Text('Rate delivered items'))),
       Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => _reorder(o['id'].toString()), icon: const Icon(Icons.replay, size: 17), label: const Text('Add items again'))),
     ]))),
   ]);
@@ -777,7 +808,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       Card(child: ListTile(leading: Icon(payment?['status'] == 'confirmed' ? Icons.check_circle : Icons.pending_outlined, color: payment?['status'] == 'confirmed' ? QuickbuddyColors.green : QuickbuddyColors.amber), title: Text('Payment ${payment?['status'] ?? 'not started'}'), subtitle: Text(payment == null ? 'No payment has been started.' : '${payment!['provider']} · ${payment!['currency']} ${payment!['amount']}'))),
       if (payment != null && payment?['status'] != 'confirmed') OutlinedButton.icon(onPressed: paymentBusy ? null : payment?['provider'] == 'sandbox' ? _resumeSandboxPayment : _refreshPaymentStatus, icon: const Icon(Icons.refresh), label: Text(paymentBusy ? 'Checking…' : payment?['provider'] == 'sandbox' ? 'Continue sandbox payment' : 'Check payment status')),
       QbPrimaryButton(label: 'Track order', onPressed: () => context.push('/orders/${widget.orderId}/tracking')),
-      if (payment?['provider'] == 'sandbox') const QbPreviewNotice(message: 'Sandbox payment has no real-money effect. Customer reviews and reorder endpoints are not configured.'),
+      if (payment?['provider'] == 'sandbox') const QbPreviewNotice(message: 'Sandbox payment has no real-money effect. You can rate delivered items from your order history.'),
     ],
   ]);
 }
@@ -787,9 +818,9 @@ class AccountScreen extends ConsumerStatefulWidget {
   @override ConsumerState<AccountScreen> createState() => _AccountScreenState();
 }
 class _AccountScreenState extends ConsumerState<AccountScreen> {
-  bool loading = true, signedIn = false; String? error; List<Map<String, dynamic>> addresses = [];
+  bool loading = true, signedIn = false; String? error; List<Map<String, dynamic>> addresses = [], tickets = [];
   @override void initState() { super.initState(); _load(); }
-  Future<void> _load() async { signedIn = await _signedIn(); if (!signedIn) { if (mounted) setState(() { loading = false; }); return; } try { final r = await ref.read(transportProvider).get('/api/v1/addresses?limit=50'); if (mounted) setState(() { addresses = _items(r.data); loading = false; error = null; }); } catch (e) { if (mounted) setState(() { loading = false; error = _message(e); }); } }
+  Future<void> _load() async { signedIn = await _signedIn(); if (!signedIn) { if (mounted) setState(() { loading = false; }); return; } try { final api = ref.read(transportProvider); final results = await Future.wait([api.get('/api/v1/addresses?limit=50'), api.get('/api/v1/me/support/tickets?limit=50')]); if (mounted) setState(() { addresses = _items(results[0].data); tickets = _items(results[1].data); loading = false; error = null; }); } catch (e) { if (mounted) setState(() { loading = false; error = _message(e); }); } }
   Future<void> _signOut() async {
     try {
       final refresh = await tokenStore.refreshToken();
@@ -798,7 +829,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       // Local credentials are always cleared even if revocation cannot reach the server.
     }
     await tokenStore.clear(); await tokenStore.deleteValue('qb_cart'); cartIdStore.value = null;
-    if (mounted) setState(() { signedIn = false; addresses = []; });
+    if (mounted) setState(() { signedIn = false; addresses = []; tickets = []; });
   }
   @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [const _PageHeader(title: 'Account', subtitle: 'Profile, addresses and help'), if (loading) const Center(child: CircularProgressIndicator()) else if (!signedIn) ...[const _InfoCard(text: 'Sign in with email and password to access your account.'), QbPrimaryButton(label: 'Sign in / create account', onPressed: () async { await context.push('/sign-in'); _load(); })] else ...[
     const ListTile(leading: CircleAvatar(child: Icon(Icons.person)), title: Text('Quickbuddy customer'), subtitle: Text('Authenticated account')),
@@ -810,7 +841,11 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     const SizedBox(height: 12),
     const QbSectionTitle('Customer services'),
     ListTile(leading: const Icon(Icons.support_agent), title: const Text('Contact support'), onTap: () => _createTicket(context)),
-    const ListTile(leading: Icon(Icons.star_border), title: Text('Ratings and reviews'), subtitle: Text('Customer rating API is not configured')),
+    if (tickets.isEmpty) const ListTile(leading: Icon(Icons.inbox_outlined), title: Text('My support requests'), subtitle: Text('Your requests and replies will appear here.')) else ...[
+      const QbSectionTitle('My support requests'),
+      ...tickets.map((ticket) => ListTile(leading: const Icon(Icons.chat_bubble_outline), title: Text(ticket['subject']?.toString() ?? 'Support request'), subtitle: Text('Status: ${ticket['status']}'), trailing: const Icon(Icons.chevron_right), onTap: () => _showTicket(ticket))),
+    ],
+    const ListTile(leading: Icon(Icons.star_border), title: Text('Ratings and reviews'), subtitle: Text('Rate delivered items from completed orders')),
     const ListTile(leading: Icon(Icons.favorite_border), title: Text('Favorites'), subtitle: Text('Favorites API is not configured')),
     OutlinedButton.icon(onPressed: _signOut, icon: const Icon(Icons.logout), label: const Text('Sign out')),
   ]]);
@@ -825,10 +860,33 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         if (message.text.trim().isNotEmpty) {
           await api.post('/api/v1/support/tickets/${created.data['id']}/messages', data: {'body': message.text.trim()});
         }
-        if (context.mounted) _snack(context, 'Support ticket ${created.data['id']} created. Ticket progress is not exposed in the customer API.');
+        if (context.mounted) _snack(context, 'Support ticket created.');
+        await _load();
       } catch (e) { if (context.mounted) _snack(context, _message(e)); }
     }
     subject.dispose(); message.dispose();
+  }
+  Future<void> _showTicket(Map<String, dynamic> ticket) async {
+    try {
+      final result = await ref.read(transportProvider).get(
+        '/api/v1/me/support/tickets/${ticket['id']}/messages?limit=50',
+      );
+      final messages = _items(result.data);
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: Text(ticket['subject']?.toString() ?? 'Support request'),
+        content: SizedBox(width: 420, height: 360, child: messages.isEmpty
+          ? const Text('No replies yet. Your support team will respond here.')
+          : ListView(shrinkWrap: true, children: messages.map((message) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(message['author'] == 'you' ? 'You' : 'Quickbuddy support', style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(message['body']?.toString() ?? ''),
+            )).toList())),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (e) {
+      if (mounted) _snack(context, _message(e));
+    }
   }
   Future<void> _addAddress(BuildContext context) async {
     final dio = ref.read(transportProvider);

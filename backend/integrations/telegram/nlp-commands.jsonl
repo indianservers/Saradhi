@@ -1,0 +1,795 @@
+{"text": "show restaurants", "target": "restaurants||||", "family": "restaurants:0", "split": "train", "synthetic": true}
+{"text": "list restaurants", "target": "restaurants||||", "family": "restaurants:1", "split": "train", "synthetic": true}
+{"text": "nearby restaurants", "target": "restaurants||||", "family": "restaurants:2", "split": "test", "synthetic": true}
+{"text": "restaurants chupinchu", "target": "restaurants||||", "family": "restaurants:3", "split": "train", "synthetic": true}
+{"text": "restaurants kavali", "target": "restaurants||||", "family": "restaurants:4", "split": "train", "synthetic": true}
+{"text": "హోటళ్లు చూపించు", "target": "restaurants||||", "family": "restaurants:5", "split": "train", "synthetic": true}
+{"text": "రెస్టారెంట్లు చూపించు", "target": "restaurants||||", "family": "restaurants:6", "split": "train", "synthetic": true}
+{"text": "रेस्टोरेंट दिखाओ", "target": "restaurants||||", "family": "restaurants:7", "split": "train", "synthetic": true}
+{"text": "रेस्टोरेंट की सूची", "target": "restaurants||||", "family": "restaurants:8", "split": "test", "synthetic": true}
+{"text": "restaurant dikhao", "target": "restaurants||||", "family": "restaurants:9", "split": "train", "synthetic": true}
+{"text": "show my cart", "target": "cart||||", "family": "cart:0", "split": "train", "synthetic": true}
+{"text": "open basket", "target": "cart||||", "family": "cart:1", "split": "train", "synthetic": true}
+{"text": "review my cart", "target": "cart||||", "family": "cart:2", "split": "test", "synthetic": true}
+{"text": "cart chupinchu", "target": "cart||||", "family": "cart:3", "split": "train", "synthetic": true}
+{"text": "నా కార్ట్ చూపించు", "target": "cart||||", "family": "cart:4", "split": "train", "synthetic": true}
+{"text": "బుట్ట చూపించు", "target": "cart||||", "family": "cart:5", "split": "train", "synthetic": true}
+{"text": "कार्ट दिखाओ", "target": "cart||||", "family": "cart:6", "split": "train", "synthetic": true}
+{"text": "मेरा कार्ट", "target": "cart||||", "family": "cart:7", "split": "train", "synthetic": true}
+{"text": "mera cart dikhao", "target": "cart||||", "family": "cart:8", "split": "test", "synthetic": true}
+{"text": "checkout please", "target": "checkout||||", "family": "checkout:0", "split": "train", "synthetic": true}
+{"text": "review before placing order", "target": "checkout||||", "family": "checkout:1", "split": "train", "synthetic": true}
+{"text": "show final bill", "target": "checkout||||", "family": "checkout:2", "split": "test", "synthetic": true}
+{"text": "checkout cheyyi", "target": "checkout||||", "family": "checkout:3", "split": "train", "synthetic": true}
+{"text": "బిల్లు చూపించు", "target": "checkout||||", "family": "checkout:4", "split": "train", "synthetic": true}
+{"text": "చెకౌట్", "target": "checkout||||", "family": "checkout:5", "split": "train", "synthetic": true}
+{"text": "बिल दिखाओ", "target": "checkout||||", "family": "checkout:6", "split": "train", "synthetic": true}
+{"text": "चेकआउट करो", "target": "checkout||||", "family": "checkout:7", "split": "train", "synthetic": true}
+{"text": "bill dikhao", "target": "checkout||||", "family": "checkout:8", "split": "test", "synthetic": true}
+{"text": "confirm my order", "target": "confirm||||", "family": "confirm:0", "split": "train", "synthetic": true}
+{"text": "place this order", "target": "confirm||||", "family": "confirm:1", "split": "train", "synthetic": true}
+{"text": "submit my order", "target": "confirm||||", "family": "confirm:2", "split": "test", "synthetic": true}
+{"text": "order confirm cheyyi", "target": "confirm||||", "family": "confirm:3", "split": "train", "synthetic": true}
+{"text": "ఆర్డర్ నిర్ధారించు", "target": "confirm||||", "family": "confirm:4", "split": "train", "synthetic": true}
+{"text": "ఆర్డర్ పెట్టు", "target": "confirm||||", "family": "confirm:5", "split": "train", "synthetic": true}
+{"text": "ऑर्डर पक्का करो", "target": "confirm||||", "family": "confirm:6", "split": "train", "synthetic": true}
+{"text": "ऑर्डर करो", "target": "confirm||||", "family": "confirm:7", "split": "train", "synthetic": true}
+{"text": "order confirm karo", "target": "confirm||||", "family": "confirm:8", "split": "test", "synthetic": true}
+{"text": "cancel current selection", "target": "cancel||||", "family": "cancel:0", "split": "train", "synthetic": true}
+{"text": "clear this draft", "target": "cancel||||", "family": "cancel:1", "split": "train", "synthetic": true}
+{"text": "never mind", "target": "cancel||||", "family": "cancel:2", "split": "test", "synthetic": true}
+{"text": "cancel cheyyi", "target": "cancel||||", "family": "cancel:3", "split": "train", "synthetic": true}
+{"text": "రద్దు చేయి", "target": "cancel||||", "family": "cancel:4", "split": "train", "synthetic": true}
+{"text": "వద్దు", "target": "cancel||||", "family": "cancel:5", "split": "train", "synthetic": true}
+{"text": "रद्द करो", "target": "cancel||||", "family": "cancel:6", "split": "train", "synthetic": true}
+{"text": "नहीं चाहिए", "target": "cancel||||", "family": "cancel:7", "split": "train", "synthetic": true}
+{"text": "cancel karo", "target": "cancel||||", "family": "cancel:8", "split": "test", "synthetic": true}
+{"text": "show cheaper options", "target": "cheaper||||", "family": "cheaper:0", "split": "train", "synthetic": true}
+{"text": "something less expensive", "target": "cheaper||||", "family": "cheaper:1", "split": "train", "synthetic": true}
+{"text": "lowest priced please", "target": "cheaper||||", "family": "cheaper:2", "split": "test", "synthetic": true}
+{"text": "takkuva dhara", "target": "cheaper||||", "family": "cheaper:3", "split": "train", "synthetic": true}
+{"text": "చౌకగా కావాలి", "target": "cheaper||||", "family": "cheaper:4", "split": "train", "synthetic": true}
+{"text": "తక్కువ ధర", "target": "cheaper||||", "family": "cheaper:5", "split": "train", "synthetic": true}
+{"text": "सस्ता दिखाओ", "target": "cheaper||||", "family": "cheaper:6", "split": "train", "synthetic": true}
+{"text": "कम दाम में", "target": "cheaper||||", "family": "cheaper:7", "split": "train", "synthetic": true}
+{"text": "sasta dikhao", "target": "cheaper||||", "family": "cheaper:8", "split": "test", "synthetic": true}
+{"text": "vegetarian only", "target": "vegetarian||||", "family": "vegetarian:0", "split": "train", "synthetic": true}
+{"text": "no meat please", "target": "vegetarian||||", "family": "vegetarian:1", "split": "train", "synthetic": true}
+{"text": "show veg dishes", "target": "vegetarian||||", "family": "vegetarian:2", "split": "test", "synthetic": true}
+{"text": "veg matrame", "target": "vegetarian||||", "family": "vegetarian:3", "split": "train", "synthetic": true}
+{"text": "శాకాహారం మాత్రమే", "target": "vegetarian||||", "family": "vegetarian:4", "split": "train", "synthetic": true}
+{"text": "వెజ్ మాత్రమే", "target": "vegetarian||||", "family": "vegetarian:5", "split": "train", "synthetic": true}
+{"text": "शाकाहारी खाना", "target": "vegetarian||||", "family": "vegetarian:6", "split": "train", "synthetic": true}
+{"text": "सिर्फ वेज", "target": "vegetarian||||", "family": "vegetarian:7", "split": "train", "synthetic": true}
+{"text": "sirf veg chahiye", "target": "vegetarian||||", "family": "vegetarian:8", "split": "test", "synthetic": true}
+{"text": "vegan dishes only", "target": "vegan||||", "family": "vegan:0", "split": "train", "synthetic": true}
+{"text": "show vegan food", "target": "vegan||||", "family": "vegan:1", "split": "train", "synthetic": true}
+{"text": "no animal products", "target": "vegan||||", "family": "vegan:2", "split": "test", "synthetic": true}
+{"text": "vegan kavali", "target": "vegan||||", "family": "vegan:3", "split": "train", "synthetic": true}
+{"text": "వీగన్ ఆహారం", "target": "vegan||||", "family": "vegan:4", "split": "train", "synthetic": true}
+{"text": "వీగన్ కావాలి", "target": "vegan||||", "family": "vegan:5", "split": "train", "synthetic": true}
+{"text": "वीगन खाना", "target": "vegan||||", "family": "vegan:6", "split": "train", "synthetic": true}
+{"text": "केवल वीगन", "target": "vegan||||", "family": "vegan:7", "split": "train", "synthetic": true}
+{"text": "vegan chahiye", "target": "vegan||||", "family": "vegan:8", "split": "test", "synthetic": true}
+{"text": "show favorites", "target": "favorites||||", "family": "favorites:0", "split": "train", "synthetic": true}
+{"text": "my saved dishes", "target": "favorites||||", "family": "favorites:1", "split": "train", "synthetic": true}
+{"text": "saved restaurants", "target": "favorites||||", "family": "favorites:2", "split": "test", "synthetic": true}
+{"text": "favorites chupinchu", "target": "favorites||||", "family": "favorites:3", "split": "train", "synthetic": true}
+{"text": "ఇష్టమైన వంటకాలు", "target": "favorites||||", "family": "favorites:4", "split": "train", "synthetic": true}
+{"text": "సేవ్ చేసినవి", "target": "favorites||||", "family": "favorites:5", "split": "train", "synthetic": true}
+{"text": "पसंदीदा खाना", "target": "favorites||||", "family": "favorites:6", "split": "train", "synthetic": true}
+{"text": "मेरे पसंदीदा", "target": "favorites||||", "family": "favorites:7", "split": "train", "synthetic": true}
+{"text": "favorites dikhao", "target": "favorites||||", "family": "favorites:8", "split": "test", "synthetic": true}
+{"text": "repeat my last order", "target": "repeat||||", "family": "repeat:0", "split": "train", "synthetic": true}
+{"text": "same as last time", "target": "repeat||||", "family": "repeat:1", "split": "train", "synthetic": true}
+{"text": "order again", "target": "repeat||||", "family": "repeat:2", "split": "test", "synthetic": true}
+{"text": "malli ade order", "target": "repeat||||", "family": "repeat:3", "split": "train", "synthetic": true}
+{"text": "మళ్ళీ అదే ఆర్డర్", "target": "repeat||||", "family": "repeat:4", "split": "train", "synthetic": true}
+{"text": "గత ఆర్డర్ మళ్ళీ", "target": "repeat||||", "family": "repeat:5", "split": "train", "synthetic": true}
+{"text": "पिछला ऑर्डर फिर से", "target": "repeat||||", "family": "repeat:6", "split": "train", "synthetic": true}
+{"text": "वही फिर से", "target": "repeat||||", "family": "repeat:7", "split": "train", "synthetic": true}
+{"text": "phir se wahi", "target": "repeat||||", "family": "repeat:8", "split": "test", "synthetic": true}
+{"text": "share my location", "target": "location||||", "family": "location:0", "split": "train", "synthetic": true}
+{"text": "use my gps", "target": "location||||", "family": "location:1", "split": "train", "synthetic": true}
+{"text": "change delivery location", "target": "location||||", "family": "location:2", "split": "test", "synthetic": true}
+{"text": "location pampali", "target": "location||||", "family": "location:3", "split": "train", "synthetic": true}
+{"text": "నా లొకేషన్", "target": "location||||", "family": "location:4", "split": "train", "synthetic": true}
+{"text": "చిరునామా మార్చు", "target": "location||||", "family": "location:5", "split": "train", "synthetic": true}
+{"text": "लोकेशन भेजो", "target": "location||||", "family": "location:6", "split": "train", "synthetic": true}
+{"text": "पता बदलो", "target": "location||||", "family": "location:7", "split": "train", "synthetic": true}
+{"text": "location bhejo", "target": "location||||", "family": "location:8", "split": "test", "synthetic": true}
+{"text": "I will pick up", "target": "pickup||||", "family": "pickup:0", "split": "train", "synthetic": true}
+{"text": "pickup please", "target": "pickup||||", "family": "pickup:1", "split": "train", "synthetic": true}
+{"text": "collect at restaurant", "target": "pickup||||", "family": "pickup:2", "split": "test", "synthetic": true}
+{"text": "pickup kavali", "target": "pickup||||", "family": "pickup:3", "split": "train", "synthetic": true}
+{"text": "నేనే తీసుకుంటాను", "target": "pickup||||", "family": "pickup:4", "split": "train", "synthetic": true}
+{"text": "పికప్ కావాలి", "target": "pickup||||", "family": "pickup:5", "split": "train", "synthetic": true}
+{"text": "खुद ले जाऊंगा", "target": "pickup||||", "family": "pickup:6", "split": "train", "synthetic": true}
+{"text": "पिकअप चाहिए", "target": "pickup||||", "family": "pickup:7", "split": "train", "synthetic": true}
+{"text": "pickup chahiye", "target": "pickup||||", "family": "pickup:8", "split": "test", "synthetic": true}
+{"text": "deliver to my home", "target": "delivery||||", "family": "delivery:0", "split": "train", "synthetic": true}
+{"text": "home delivery", "target": "delivery||||", "family": "delivery:1", "split": "train", "synthetic": true}
+{"text": "send it to my location", "target": "delivery||||", "family": "delivery:2", "split": "test", "synthetic": true}
+{"text": "intiki pampu", "target": "delivery||||", "family": "delivery:3", "split": "train", "synthetic": true}
+{"text": "ఇంటికి పంపు", "target": "delivery||||", "family": "delivery:4", "split": "train", "synthetic": true}
+{"text": "డెలివరీ కావాలి", "target": "delivery||||", "family": "delivery:5", "split": "train", "synthetic": true}
+{"text": "घर पर भेजो", "target": "delivery||||", "family": "delivery:6", "split": "train", "synthetic": true}
+{"text": "डिलीवरी चाहिए", "target": "delivery||||", "family": "delivery:7", "split": "train", "synthetic": true}
+{"text": "ghar bhejo", "target": "delivery||||", "family": "delivery:8", "split": "test", "synthetic": true}
+{"text": "show my orders", "target": "orders||||", "family": "orders:0", "split": "train", "synthetic": true}
+{"text": "track my order", "target": "orders||||", "family": "orders:1", "split": "train", "synthetic": true}
+{"text": "was my order accepted", "target": "orders||||", "family": "orders:2", "split": "test", "synthetic": true}
+{"text": "order status enti", "target": "orders||||", "family": "orders:3", "split": "train", "synthetic": true}
+{"text": "ఆర్డర్ స్థితి", "target": "orders||||", "family": "orders:4", "split": "train", "synthetic": true}
+{"text": "నా ఆర్డర్లు", "target": "orders||||", "family": "orders:5", "split": "train", "synthetic": true}
+{"text": "ऑर्डर कहाँ है", "target": "orders||||", "family": "orders:6", "split": "train", "synthetic": true}
+{"text": "मेरे ऑर्डर", "target": "orders||||", "family": "orders:7", "split": "train", "synthetic": true}
+{"text": "order kahan hai", "target": "orders||||", "family": "orders:8", "split": "test", "synthetic": true}
+{"text": "what allergens are in this", "target": "allergens||||", "family": "allergens:0", "split": "train", "synthetic": true}
+{"text": "show ingredients", "target": "allergens||||", "family": "allergens:1", "split": "train", "synthetic": true}
+{"text": "does this contain nuts", "target": "allergens||||", "family": "allergens:2", "split": "test", "synthetic": true}
+{"text": "ingredients enti", "target": "allergens||||", "family": "allergens:3", "split": "train", "synthetic": true}
+{"text": "అలెర్జీ వివరాలు", "target": "allergens||||", "family": "allergens:4", "split": "train", "synthetic": true}
+{"text": "పదార్థాలు ఏమిటి", "target": "allergens||||", "family": "allergens:5", "split": "train", "synthetic": true}
+{"text": "एलर्जी की जानकारी", "target": "allergens||||", "family": "allergens:6", "split": "train", "synthetic": true}
+{"text": "सामग्री बताओ", "target": "allergens||||", "family": "allergens:7", "split": "train", "synthetic": true}
+{"text": "ingredients batao", "target": "allergens||||", "family": "allergens:8", "split": "test", "synthetic": true}
+{"text": "suggest a meal", "target": "suggest||||", "family": "suggest:0", "split": "train", "synthetic": true}
+{"text": "recommend a combination", "target": "suggest||||", "family": "suggest:1", "split": "train", "synthetic": true}
+{"text": "help plan lunch", "target": "suggest||||", "family": "suggest:2", "split": "test", "synthetic": true}
+{"text": "meal suggest cheyyi", "target": "suggest||||", "family": "suggest:3", "split": "train", "synthetic": true}
+{"text": "భోజనం సూచించు", "target": "suggest||||", "family": "suggest:4", "split": "train", "synthetic": true}
+{"text": "ఏం తినాలి", "target": "suggest||||", "family": "suggest:5", "split": "train", "synthetic": true}
+{"text": "खाना सुझाओ", "target": "suggest||||", "family": "suggest:6", "split": "train", "synthetic": true}
+{"text": "क्या खाऊँ", "target": "suggest||||", "family": "suggest:7", "split": "train", "synthetic": true}
+{"text": "khana suggest karo", "target": "suggest||||", "family": "suggest:8", "split": "test", "synthetic": true}
+{"text": "help me order", "target": "help||||", "family": "help:0", "split": "train", "synthetic": true}
+{"text": "how does this work", "target": "help||||", "family": "help:1", "split": "train", "synthetic": true}
+{"text": "what can you do", "target": "help||||", "family": "help:2", "split": "test", "synthetic": true}
+{"text": "help cheyyi", "target": "help||||", "family": "help:3", "split": "train", "synthetic": true}
+{"text": "సహాయం కావాలి", "target": "help||||", "family": "help:4", "split": "train", "synthetic": true}
+{"text": "ఎలా ఆర్డర్ చేయాలి", "target": "help||||", "family": "help:5", "split": "train", "synthetic": true}
+{"text": "मदद करो", "target": "help||||", "family": "help:6", "split": "train", "synthetic": true}
+{"text": "ऑर्डर कैसे करें", "target": "help||||", "family": "help:7", "split": "train", "synthetic": true}
+{"text": "madad karo", "target": "help||||", "family": "help:8", "split": "test", "synthetic": true}
+{"text": "restaurants nearby please", "target": "restaurants||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "restaurant list dikhao", "target": "restaurants||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "रेस्टोरेंट सूची दिखाओ", "target": "restaurants||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "review cart", "target": "cart||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "mera cart please", "target": "cart||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "cart dikhao please", "target": "cart||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "review basket", "target": "cart||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "final bill please", "target": "checkout||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "mera bill dikhao", "target": "checkout||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "checkout bill", "target": "checkout||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "bill dikhao please", "target": "checkout||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "submit order please", "target": "confirm||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "confirm order karo", "target": "confirm||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "please submit this order", "target": "confirm||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "I changed my mind", "target": "cancel||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "never mind cancel", "target": "cancel||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "please cancel karo", "target": "cancel||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "lowest price please", "target": "cheaper||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "sasta khana dikhao", "target": "cheaper||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "low priced food", "target": "cheaper||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "sirf vegetarian chahiye", "target": "vegetarian||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "veg chahiye please", "target": "vegetarian||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "शाकाहारी व्यंजन दिखाओ", "target": "vegetarian||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "vegan meal chahiye", "target": "vegan||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "please vegan chahiye", "target": "vegan||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "only vegan meals", "target": "vegan||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "my favorites dikhao", "target": "favorites||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "favorites list dikhao", "target": "favorites||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "show preferred dishes", "target": "favorites||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "phir se wahi order", "target": "repeat||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "wahi khana phir se", "target": "repeat||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "repeat same meal", "target": "repeat||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "location bhejo please", "target": "location||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "my location please", "target": "location||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "please change location", "target": "location||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "pickup chahiye please", "target": "pickup||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "please collect at restaurant", "target": "pickup||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "restaurant pickup", "target": "pickup||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "ghar bhejo please", "target": "delivery||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "please send home", "target": "delivery||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "deliver at home", "target": "delivery||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "mera order kahan hai", "target": "orders||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "order location status", "target": "orders||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "track my current order", "target": "orders||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "ingredients batao please", "target": "allergens||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "allergen details please", "target": "allergens||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "contains nuts question", "target": "allergens||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "khana suggest karo please", "target": "suggest||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "lunch suggestion please", "target": "suggest||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "plan a meal", "target": "suggest||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "madad karo please", "target": "help||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "please help with ordering", "target": "help||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "show ordering help", "target": "help||||", "family": "additional paraphrases", "split": "train", "synthetic": true}
+{"text": "I want chicken biryani", "target": "search|chicken biryani|||", "family": "search:0", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani", "target": "search|chicken biryani|||", "family": "search:1", "split": "train", "synthetic": true}
+{"text": "show me chicken biryani", "target": "search|chicken biryani|||", "family": "search:2", "split": "test", "synthetic": true}
+{"text": "chicken biryani kavali", "target": "search|chicken biryani|||", "family": "search:3", "split": "train", "synthetic": true}
+{"text": "naaku chicken biryani ivvandi", "target": "search|chicken biryani|||", "family": "search:4", "split": "test", "synthetic": true}
+{"text": "chicken biryani chahiye", "target": "search|chicken biryani|||", "family": "search:5", "split": "train", "synthetic": true}
+{"text": "mujhe chicken biryani do", "target": "search|chicken biryani|||", "family": "search:6", "split": "train", "synthetic": true}
+{"text": "నాకు చికెన్ బిర్యానీ కావాలి", "target": "search|chicken biryani|||", "family": "search:7", "split": "train", "synthetic": true}
+{"text": "చికెన్ బిర్యానీ చూపించు", "target": "search|chicken biryani|||", "family": "search:8", "split": "train", "synthetic": true}
+{"text": "मुझे चिकन बिरयानी चाहिए", "target": "search|chicken biryani|||", "family": "search:9", "split": "train", "synthetic": true}
+{"text": "चिकन बिरयानी दिखाओ", "target": "search|chicken biryani|||", "family": "search:10", "split": "train", "synthetic": true}
+{"text": "1 chicken biryani under 150", "target": "search|chicken biryani|1|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 1 people below 150", "target": "search|chicken biryani|1|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 chicken biryani kavali 150 lopu", "target": "search|chicken biryani|1|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 chicken biryani chahiye 150 ke andar", "target": "search|chicken biryani|1|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 150 for 1 people", "target": "search|chicken biryani|1|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 1 people under 150", "target": "search|chicken biryani|1|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of chicken biryani below 150", "target": "search|chicken biryani|1|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 chicken biryani under 250", "target": "search|chicken biryani|1|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 1 people below 250", "target": "search|chicken biryani|1|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 chicken biryani kavali 250 lopu", "target": "search|chicken biryani|1|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 chicken biryani chahiye 250 ke andar", "target": "search|chicken biryani|1|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 250 for 1 people", "target": "search|chicken biryani|1|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 1 people under 250", "target": "search|chicken biryani|1|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of chicken biryani below 250", "target": "search|chicken biryani|1|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 chicken biryani under 400", "target": "search|chicken biryani|1|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 1 people below 400", "target": "search|chicken biryani|1|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 chicken biryani kavali 400 lopu", "target": "search|chicken biryani|1|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 chicken biryani chahiye 400 ke andar", "target": "search|chicken biryani|1|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 400 for 1 people", "target": "search|chicken biryani|1|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 1 people under 400", "target": "search|chicken biryani|1|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of chicken biryani below 400", "target": "search|chicken biryani|1|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 chicken biryani under 150", "target": "search|chicken biryani|2|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 2 people below 150", "target": "search|chicken biryani|2|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 chicken biryani kavali 150 lopu", "target": "search|chicken biryani|2|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 chicken biryani chahiye 150 ke andar", "target": "search|chicken biryani|2|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 150 for 2 people", "target": "search|chicken biryani|2|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 2 people under 150", "target": "search|chicken biryani|2|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of chicken biryani below 150", "target": "search|chicken biryani|2|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 chicken biryani under 250", "target": "search|chicken biryani|2|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 2 people below 250", "target": "search|chicken biryani|2|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 chicken biryani kavali 250 lopu", "target": "search|chicken biryani|2|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 chicken biryani chahiye 250 ke andar", "target": "search|chicken biryani|2|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 250 for 2 people", "target": "search|chicken biryani|2|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 2 people under 250", "target": "search|chicken biryani|2|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of chicken biryani below 250", "target": "search|chicken biryani|2|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 chicken biryani under 400", "target": "search|chicken biryani|2|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 2 people below 400", "target": "search|chicken biryani|2|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 chicken biryani kavali 400 lopu", "target": "search|chicken biryani|2|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 chicken biryani chahiye 400 ke andar", "target": "search|chicken biryani|2|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 400 for 2 people", "target": "search|chicken biryani|2|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 2 people under 400", "target": "search|chicken biryani|2|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of chicken biryani below 400", "target": "search|chicken biryani|2|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 chicken biryani under 150", "target": "search|chicken biryani|3|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 3 people below 150", "target": "search|chicken biryani|3|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 chicken biryani kavali 150 lopu", "target": "search|chicken biryani|3|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 chicken biryani chahiye 150 ke andar", "target": "search|chicken biryani|3|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 150 for 3 people", "target": "search|chicken biryani|3|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 3 people under 150", "target": "search|chicken biryani|3|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of chicken biryani below 150", "target": "search|chicken biryani|3|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 chicken biryani under 250", "target": "search|chicken biryani|3|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 3 people below 250", "target": "search|chicken biryani|3|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 chicken biryani kavali 250 lopu", "target": "search|chicken biryani|3|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 chicken biryani chahiye 250 ke andar", "target": "search|chicken biryani|3|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 250 for 3 people", "target": "search|chicken biryani|3|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 3 people under 250", "target": "search|chicken biryani|3|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of chicken biryani below 250", "target": "search|chicken biryani|3|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 chicken biryani under 400", "target": "search|chicken biryani|3|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 3 people below 400", "target": "search|chicken biryani|3|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 chicken biryani kavali 400 lopu", "target": "search|chicken biryani|3|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 chicken biryani chahiye 400 ke andar", "target": "search|chicken biryani|3|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 400 for 3 people", "target": "search|chicken biryani|3|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 3 people under 400", "target": "search|chicken biryani|3|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of chicken biryani below 400", "target": "search|chicken biryani|3|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 chicken biryani under 150", "target": "search|chicken biryani|4|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 4 people below 150", "target": "search|chicken biryani|4|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 chicken biryani kavali 150 lopu", "target": "search|chicken biryani|4|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 chicken biryani chahiye 150 ke andar", "target": "search|chicken biryani|4|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 150 for 4 people", "target": "search|chicken biryani|4|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 4 people under 150", "target": "search|chicken biryani|4|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of chicken biryani below 150", "target": "search|chicken biryani|4|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 chicken biryani under 250", "target": "search|chicken biryani|4|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 4 people below 250", "target": "search|chicken biryani|4|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 chicken biryani kavali 250 lopu", "target": "search|chicken biryani|4|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 chicken biryani chahiye 250 ke andar", "target": "search|chicken biryani|4|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 250 for 4 people", "target": "search|chicken biryani|4|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 4 people under 250", "target": "search|chicken biryani|4|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of chicken biryani below 250", "target": "search|chicken biryani|4|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 chicken biryani under 400", "target": "search|chicken biryani|4|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "chicken biryani for 4 people below 400", "target": "search|chicken biryani|4|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 chicken biryani kavali 400 lopu", "target": "search|chicken biryani|4|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 chicken biryani chahiye 400 ke andar", "target": "search|chicken biryani|4|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find chicken biryani under 400 for 4 people", "target": "search|chicken biryani|4|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order chicken biryani for 4 people under 400", "target": "search|chicken biryani|4|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of chicken biryani below 400", "target": "search|chicken biryani|4|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "I want veg biryani", "target": "search|veg biryani|||", "family": "search:0", "split": "train", "synthetic": true}
+{"text": "please find veg biryani", "target": "search|veg biryani|||", "family": "search:1", "split": "train", "synthetic": true}
+{"text": "show me veg biryani", "target": "search|veg biryani|||", "family": "search:2", "split": "test", "synthetic": true}
+{"text": "veg biryani kavali", "target": "search|veg biryani|||", "family": "search:3", "split": "train", "synthetic": true}
+{"text": "naaku veg biryani ivvandi", "target": "search|veg biryani|||", "family": "search:4", "split": "test", "synthetic": true}
+{"text": "veg biryani chahiye", "target": "search|veg biryani|||", "family": "search:5", "split": "train", "synthetic": true}
+{"text": "mujhe veg biryani do", "target": "search|veg biryani|||", "family": "search:6", "split": "train", "synthetic": true}
+{"text": "నాకు వెజ్ బిర్యానీ కావాలి", "target": "search|veg biryani|||", "family": "search:7", "split": "train", "synthetic": true}
+{"text": "వెజ్ బిర్యానీ చూపించు", "target": "search|veg biryani|||", "family": "search:8", "split": "train", "synthetic": true}
+{"text": "मुझे वेज बिरयानी चाहिए", "target": "search|veg biryani|||", "family": "search:9", "split": "train", "synthetic": true}
+{"text": "वेज बिरयानी दिखाओ", "target": "search|veg biryani|||", "family": "search:10", "split": "train", "synthetic": true}
+{"text": "1 veg biryani under 150", "target": "search|veg biryani|1|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 1 people below 150", "target": "search|veg biryani|1|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 veg biryani kavali 150 lopu", "target": "search|veg biryani|1|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 veg biryani chahiye 150 ke andar", "target": "search|veg biryani|1|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 150 for 1 people", "target": "search|veg biryani|1|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 1 people under 150", "target": "search|veg biryani|1|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of veg biryani below 150", "target": "search|veg biryani|1|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 veg biryani under 250", "target": "search|veg biryani|1|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 1 people below 250", "target": "search|veg biryani|1|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 veg biryani kavali 250 lopu", "target": "search|veg biryani|1|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 veg biryani chahiye 250 ke andar", "target": "search|veg biryani|1|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 250 for 1 people", "target": "search|veg biryani|1|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 1 people under 250", "target": "search|veg biryani|1|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of veg biryani below 250", "target": "search|veg biryani|1|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 veg biryani under 400", "target": "search|veg biryani|1|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 1 people below 400", "target": "search|veg biryani|1|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 veg biryani kavali 400 lopu", "target": "search|veg biryani|1|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 veg biryani chahiye 400 ke andar", "target": "search|veg biryani|1|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 400 for 1 people", "target": "search|veg biryani|1|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 1 people under 400", "target": "search|veg biryani|1|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of veg biryani below 400", "target": "search|veg biryani|1|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 veg biryani under 150", "target": "search|veg biryani|2|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 2 people below 150", "target": "search|veg biryani|2|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 veg biryani kavali 150 lopu", "target": "search|veg biryani|2|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 veg biryani chahiye 150 ke andar", "target": "search|veg biryani|2|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 150 for 2 people", "target": "search|veg biryani|2|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 2 people under 150", "target": "search|veg biryani|2|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of veg biryani below 150", "target": "search|veg biryani|2|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 veg biryani under 250", "target": "search|veg biryani|2|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 2 people below 250", "target": "search|veg biryani|2|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 veg biryani kavali 250 lopu", "target": "search|veg biryani|2|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 veg biryani chahiye 250 ke andar", "target": "search|veg biryani|2|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 250 for 2 people", "target": "search|veg biryani|2|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 2 people under 250", "target": "search|veg biryani|2|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of veg biryani below 250", "target": "search|veg biryani|2|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 veg biryani under 400", "target": "search|veg biryani|2|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 2 people below 400", "target": "search|veg biryani|2|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 veg biryani kavali 400 lopu", "target": "search|veg biryani|2|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 veg biryani chahiye 400 ke andar", "target": "search|veg biryani|2|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 400 for 2 people", "target": "search|veg biryani|2|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 2 people under 400", "target": "search|veg biryani|2|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of veg biryani below 400", "target": "search|veg biryani|2|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 veg biryani under 150", "target": "search|veg biryani|3|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 3 people below 150", "target": "search|veg biryani|3|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 veg biryani kavali 150 lopu", "target": "search|veg biryani|3|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 veg biryani chahiye 150 ke andar", "target": "search|veg biryani|3|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 150 for 3 people", "target": "search|veg biryani|3|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 3 people under 150", "target": "search|veg biryani|3|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of veg biryani below 150", "target": "search|veg biryani|3|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 veg biryani under 250", "target": "search|veg biryani|3|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 3 people below 250", "target": "search|veg biryani|3|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 veg biryani kavali 250 lopu", "target": "search|veg biryani|3|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 veg biryani chahiye 250 ke andar", "target": "search|veg biryani|3|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 250 for 3 people", "target": "search|veg biryani|3|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 3 people under 250", "target": "search|veg biryani|3|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of veg biryani below 250", "target": "search|veg biryani|3|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 veg biryani under 400", "target": "search|veg biryani|3|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 3 people below 400", "target": "search|veg biryani|3|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 veg biryani kavali 400 lopu", "target": "search|veg biryani|3|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 veg biryani chahiye 400 ke andar", "target": "search|veg biryani|3|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 400 for 3 people", "target": "search|veg biryani|3|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 3 people under 400", "target": "search|veg biryani|3|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of veg biryani below 400", "target": "search|veg biryani|3|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 veg biryani under 150", "target": "search|veg biryani|4|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 4 people below 150", "target": "search|veg biryani|4|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 veg biryani kavali 150 lopu", "target": "search|veg biryani|4|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 veg biryani chahiye 150 ke andar", "target": "search|veg biryani|4|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 150 for 4 people", "target": "search|veg biryani|4|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 4 people under 150", "target": "search|veg biryani|4|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of veg biryani below 150", "target": "search|veg biryani|4|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 veg biryani under 250", "target": "search|veg biryani|4|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 4 people below 250", "target": "search|veg biryani|4|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 veg biryani kavali 250 lopu", "target": "search|veg biryani|4|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 veg biryani chahiye 250 ke andar", "target": "search|veg biryani|4|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 250 for 4 people", "target": "search|veg biryani|4|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 4 people under 250", "target": "search|veg biryani|4|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of veg biryani below 250", "target": "search|veg biryani|4|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 veg biryani under 400", "target": "search|veg biryani|4|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "veg biryani for 4 people below 400", "target": "search|veg biryani|4|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 veg biryani kavali 400 lopu", "target": "search|veg biryani|4|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 veg biryani chahiye 400 ke andar", "target": "search|veg biryani|4|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find veg biryani under 400 for 4 people", "target": "search|veg biryani|4|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order veg biryani for 4 people under 400", "target": "search|veg biryani|4|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of veg biryani below 400", "target": "search|veg biryani|4|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "I want mutton biryani", "target": "search|mutton biryani|||", "family": "search:0", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani", "target": "search|mutton biryani|||", "family": "search:1", "split": "train", "synthetic": true}
+{"text": "show me mutton biryani", "target": "search|mutton biryani|||", "family": "search:2", "split": "test", "synthetic": true}
+{"text": "mutton biryani kavali", "target": "search|mutton biryani|||", "family": "search:3", "split": "train", "synthetic": true}
+{"text": "naaku mutton biryani ivvandi", "target": "search|mutton biryani|||", "family": "search:4", "split": "test", "synthetic": true}
+{"text": "mutton biryani chahiye", "target": "search|mutton biryani|||", "family": "search:5", "split": "train", "synthetic": true}
+{"text": "mujhe mutton biryani do", "target": "search|mutton biryani|||", "family": "search:6", "split": "train", "synthetic": true}
+{"text": "నాకు మటన్ బిర్యానీ కావాలి", "target": "search|mutton biryani|||", "family": "search:7", "split": "train", "synthetic": true}
+{"text": "మటన్ బిర్యానీ చూపించు", "target": "search|mutton biryani|||", "family": "search:8", "split": "train", "synthetic": true}
+{"text": "मुझे मटन बिरयानी चाहिए", "target": "search|mutton biryani|||", "family": "search:9", "split": "train", "synthetic": true}
+{"text": "मटन बिरयानी दिखाओ", "target": "search|mutton biryani|||", "family": "search:10", "split": "train", "synthetic": true}
+{"text": "1 mutton biryani under 150", "target": "search|mutton biryani|1|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 1 people below 150", "target": "search|mutton biryani|1|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 mutton biryani kavali 150 lopu", "target": "search|mutton biryani|1|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 mutton biryani chahiye 150 ke andar", "target": "search|mutton biryani|1|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 150 for 1 people", "target": "search|mutton biryani|1|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 1 people under 150", "target": "search|mutton biryani|1|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of mutton biryani below 150", "target": "search|mutton biryani|1|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 mutton biryani under 250", "target": "search|mutton biryani|1|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 1 people below 250", "target": "search|mutton biryani|1|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 mutton biryani kavali 250 lopu", "target": "search|mutton biryani|1|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 mutton biryani chahiye 250 ke andar", "target": "search|mutton biryani|1|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 250 for 1 people", "target": "search|mutton biryani|1|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 1 people under 250", "target": "search|mutton biryani|1|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of mutton biryani below 250", "target": "search|mutton biryani|1|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 mutton biryani under 400", "target": "search|mutton biryani|1|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 1 people below 400", "target": "search|mutton biryani|1|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 mutton biryani kavali 400 lopu", "target": "search|mutton biryani|1|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 mutton biryani chahiye 400 ke andar", "target": "search|mutton biryani|1|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 400 for 1 people", "target": "search|mutton biryani|1|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 1 people under 400", "target": "search|mutton biryani|1|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of mutton biryani below 400", "target": "search|mutton biryani|1|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 mutton biryani under 150", "target": "search|mutton biryani|2|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 2 people below 150", "target": "search|mutton biryani|2|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 mutton biryani kavali 150 lopu", "target": "search|mutton biryani|2|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 mutton biryani chahiye 150 ke andar", "target": "search|mutton biryani|2|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 150 for 2 people", "target": "search|mutton biryani|2|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 2 people under 150", "target": "search|mutton biryani|2|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of mutton biryani below 150", "target": "search|mutton biryani|2|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 mutton biryani under 250", "target": "search|mutton biryani|2|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 2 people below 250", "target": "search|mutton biryani|2|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 mutton biryani kavali 250 lopu", "target": "search|mutton biryani|2|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 mutton biryani chahiye 250 ke andar", "target": "search|mutton biryani|2|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 250 for 2 people", "target": "search|mutton biryani|2|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 2 people under 250", "target": "search|mutton biryani|2|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of mutton biryani below 250", "target": "search|mutton biryani|2|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 mutton biryani under 400", "target": "search|mutton biryani|2|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 2 people below 400", "target": "search|mutton biryani|2|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 mutton biryani kavali 400 lopu", "target": "search|mutton biryani|2|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 mutton biryani chahiye 400 ke andar", "target": "search|mutton biryani|2|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 400 for 2 people", "target": "search|mutton biryani|2|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 2 people under 400", "target": "search|mutton biryani|2|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of mutton biryani below 400", "target": "search|mutton biryani|2|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 mutton biryani under 150", "target": "search|mutton biryani|3|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 3 people below 150", "target": "search|mutton biryani|3|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 mutton biryani kavali 150 lopu", "target": "search|mutton biryani|3|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 mutton biryani chahiye 150 ke andar", "target": "search|mutton biryani|3|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 150 for 3 people", "target": "search|mutton biryani|3|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 3 people under 150", "target": "search|mutton biryani|3|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of mutton biryani below 150", "target": "search|mutton biryani|3|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 mutton biryani under 250", "target": "search|mutton biryani|3|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 3 people below 250", "target": "search|mutton biryani|3|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 mutton biryani kavali 250 lopu", "target": "search|mutton biryani|3|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 mutton biryani chahiye 250 ke andar", "target": "search|mutton biryani|3|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 250 for 3 people", "target": "search|mutton biryani|3|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 3 people under 250", "target": "search|mutton biryani|3|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of mutton biryani below 250", "target": "search|mutton biryani|3|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 mutton biryani under 400", "target": "search|mutton biryani|3|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 3 people below 400", "target": "search|mutton biryani|3|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 mutton biryani kavali 400 lopu", "target": "search|mutton biryani|3|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 mutton biryani chahiye 400 ke andar", "target": "search|mutton biryani|3|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 400 for 3 people", "target": "search|mutton biryani|3|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 3 people under 400", "target": "search|mutton biryani|3|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of mutton biryani below 400", "target": "search|mutton biryani|3|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 mutton biryani under 150", "target": "search|mutton biryani|4|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 4 people below 150", "target": "search|mutton biryani|4|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 mutton biryani kavali 150 lopu", "target": "search|mutton biryani|4|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 mutton biryani chahiye 150 ke andar", "target": "search|mutton biryani|4|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 150 for 4 people", "target": "search|mutton biryani|4|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 4 people under 150", "target": "search|mutton biryani|4|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of mutton biryani below 150", "target": "search|mutton biryani|4|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 mutton biryani under 250", "target": "search|mutton biryani|4|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 4 people below 250", "target": "search|mutton biryani|4|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 mutton biryani kavali 250 lopu", "target": "search|mutton biryani|4|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 mutton biryani chahiye 250 ke andar", "target": "search|mutton biryani|4|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 250 for 4 people", "target": "search|mutton biryani|4|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 4 people under 250", "target": "search|mutton biryani|4|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of mutton biryani below 250", "target": "search|mutton biryani|4|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 mutton biryani under 400", "target": "search|mutton biryani|4|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "mutton biryani for 4 people below 400", "target": "search|mutton biryani|4|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 mutton biryani kavali 400 lopu", "target": "search|mutton biryani|4|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 mutton biryani chahiye 400 ke andar", "target": "search|mutton biryani|4|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find mutton biryani under 400 for 4 people", "target": "search|mutton biryani|4|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order mutton biryani for 4 people under 400", "target": "search|mutton biryani|4|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of mutton biryani below 400", "target": "search|mutton biryani|4|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "I want paneer", "target": "search|paneer|||", "family": "search:0", "split": "train", "synthetic": true}
+{"text": "please find paneer", "target": "search|paneer|||", "family": "search:1", "split": "train", "synthetic": true}
+{"text": "show me paneer", "target": "search|paneer|||", "family": "search:2", "split": "test", "synthetic": true}
+{"text": "paneer kavali", "target": "search|paneer|||", "family": "search:3", "split": "train", "synthetic": true}
+{"text": "naaku paneer ivvandi", "target": "search|paneer|||", "family": "search:4", "split": "test", "synthetic": true}
+{"text": "paneer chahiye", "target": "search|paneer|||", "family": "search:5", "split": "train", "synthetic": true}
+{"text": "mujhe paneer do", "target": "search|paneer|||", "family": "search:6", "split": "train", "synthetic": true}
+{"text": "నాకు పనీర్ కావాలి", "target": "search|paneer|||", "family": "search:7", "split": "train", "synthetic": true}
+{"text": "పనీర్ చూపించు", "target": "search|paneer|||", "family": "search:8", "split": "train", "synthetic": true}
+{"text": "मुझे पनीर चाहिए", "target": "search|paneer|||", "family": "search:9", "split": "train", "synthetic": true}
+{"text": "पनीर दिखाओ", "target": "search|paneer|||", "family": "search:10", "split": "train", "synthetic": true}
+{"text": "1 paneer under 150", "target": "search|paneer|1|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 1 people below 150", "target": "search|paneer|1|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 paneer kavali 150 lopu", "target": "search|paneer|1|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 paneer chahiye 150 ke andar", "target": "search|paneer|1|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 150 for 1 people", "target": "search|paneer|1|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 1 people under 150", "target": "search|paneer|1|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of paneer below 150", "target": "search|paneer|1|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 paneer under 250", "target": "search|paneer|1|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 1 people below 250", "target": "search|paneer|1|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 paneer kavali 250 lopu", "target": "search|paneer|1|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 paneer chahiye 250 ke andar", "target": "search|paneer|1|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 250 for 1 people", "target": "search|paneer|1|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 1 people under 250", "target": "search|paneer|1|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of paneer below 250", "target": "search|paneer|1|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 paneer under 400", "target": "search|paneer|1|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 1 people below 400", "target": "search|paneer|1|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 paneer kavali 400 lopu", "target": "search|paneer|1|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 paneer chahiye 400 ke andar", "target": "search|paneer|1|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 400 for 1 people", "target": "search|paneer|1|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 1 people under 400", "target": "search|paneer|1|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of paneer below 400", "target": "search|paneer|1|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 paneer under 150", "target": "search|paneer|2|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 2 people below 150", "target": "search|paneer|2|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 paneer kavali 150 lopu", "target": "search|paneer|2|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 paneer chahiye 150 ke andar", "target": "search|paneer|2|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 150 for 2 people", "target": "search|paneer|2|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 2 people under 150", "target": "search|paneer|2|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of paneer below 150", "target": "search|paneer|2|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 paneer under 250", "target": "search|paneer|2|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 2 people below 250", "target": "search|paneer|2|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 paneer kavali 250 lopu", "target": "search|paneer|2|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 paneer chahiye 250 ke andar", "target": "search|paneer|2|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 250 for 2 people", "target": "search|paneer|2|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 2 people under 250", "target": "search|paneer|2|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of paneer below 250", "target": "search|paneer|2|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 paneer under 400", "target": "search|paneer|2|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 2 people below 400", "target": "search|paneer|2|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 paneer kavali 400 lopu", "target": "search|paneer|2|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 paneer chahiye 400 ke andar", "target": "search|paneer|2|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 400 for 2 people", "target": "search|paneer|2|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 2 people under 400", "target": "search|paneer|2|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of paneer below 400", "target": "search|paneer|2|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 paneer under 150", "target": "search|paneer|3|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 3 people below 150", "target": "search|paneer|3|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 paneer kavali 150 lopu", "target": "search|paneer|3|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 paneer chahiye 150 ke andar", "target": "search|paneer|3|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 150 for 3 people", "target": "search|paneer|3|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 3 people under 150", "target": "search|paneer|3|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of paneer below 150", "target": "search|paneer|3|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 paneer under 250", "target": "search|paneer|3|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 3 people below 250", "target": "search|paneer|3|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 paneer kavali 250 lopu", "target": "search|paneer|3|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 paneer chahiye 250 ke andar", "target": "search|paneer|3|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 250 for 3 people", "target": "search|paneer|3|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 3 people under 250", "target": "search|paneer|3|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of paneer below 250", "target": "search|paneer|3|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 paneer under 400", "target": "search|paneer|3|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 3 people below 400", "target": "search|paneer|3|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 paneer kavali 400 lopu", "target": "search|paneer|3|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 paneer chahiye 400 ke andar", "target": "search|paneer|3|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 400 for 3 people", "target": "search|paneer|3|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 3 people under 400", "target": "search|paneer|3|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of paneer below 400", "target": "search|paneer|3|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 paneer under 150", "target": "search|paneer|4|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 4 people below 150", "target": "search|paneer|4|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 paneer kavali 150 lopu", "target": "search|paneer|4|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 paneer chahiye 150 ke andar", "target": "search|paneer|4|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 150 for 4 people", "target": "search|paneer|4|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 4 people under 150", "target": "search|paneer|4|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of paneer below 150", "target": "search|paneer|4|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 paneer under 250", "target": "search|paneer|4|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 4 people below 250", "target": "search|paneer|4|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 paneer kavali 250 lopu", "target": "search|paneer|4|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 paneer chahiye 250 ke andar", "target": "search|paneer|4|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 250 for 4 people", "target": "search|paneer|4|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 4 people under 250", "target": "search|paneer|4|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of paneer below 250", "target": "search|paneer|4|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 paneer under 400", "target": "search|paneer|4|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "paneer for 4 people below 400", "target": "search|paneer|4|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 paneer kavali 400 lopu", "target": "search|paneer|4|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 paneer chahiye 400 ke andar", "target": "search|paneer|4|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find paneer under 400 for 4 people", "target": "search|paneer|4|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order paneer for 4 people under 400", "target": "search|paneer|4|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of paneer below 400", "target": "search|paneer|4|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "I want masala dosa", "target": "search|masala dosa|||", "family": "search:0", "split": "train", "synthetic": true}
+{"text": "please find masala dosa", "target": "search|masala dosa|||", "family": "search:1", "split": "train", "synthetic": true}
+{"text": "show me masala dosa", "target": "search|masala dosa|||", "family": "search:2", "split": "test", "synthetic": true}
+{"text": "masala dosa kavali", "target": "search|masala dosa|||", "family": "search:3", "split": "train", "synthetic": true}
+{"text": "naaku masala dosa ivvandi", "target": "search|masala dosa|||", "family": "search:4", "split": "test", "synthetic": true}
+{"text": "masala dosa chahiye", "target": "search|masala dosa|||", "family": "search:5", "split": "train", "synthetic": true}
+{"text": "mujhe masala dosa do", "target": "search|masala dosa|||", "family": "search:6", "split": "train", "synthetic": true}
+{"text": "నాకు మసాలా దోస కావాలి", "target": "search|masala dosa|||", "family": "search:7", "split": "train", "synthetic": true}
+{"text": "మసాలా దోస చూపించు", "target": "search|masala dosa|||", "family": "search:8", "split": "train", "synthetic": true}
+{"text": "मुझे मसाला डोसा चाहिए", "target": "search|masala dosa|||", "family": "search:9", "split": "train", "synthetic": true}
+{"text": "मसाला डोसा दिखाओ", "target": "search|masala dosa|||", "family": "search:10", "split": "train", "synthetic": true}
+{"text": "1 masala dosa under 150", "target": "search|masala dosa|1|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 1 people below 150", "target": "search|masala dosa|1|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 masala dosa kavali 150 lopu", "target": "search|masala dosa|1|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 masala dosa chahiye 150 ke andar", "target": "search|masala dosa|1|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 150 for 1 people", "target": "search|masala dosa|1|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 1 people under 150", "target": "search|masala dosa|1|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of masala dosa below 150", "target": "search|masala dosa|1|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 masala dosa under 250", "target": "search|masala dosa|1|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 1 people below 250", "target": "search|masala dosa|1|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 masala dosa kavali 250 lopu", "target": "search|masala dosa|1|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 masala dosa chahiye 250 ke andar", "target": "search|masala dosa|1|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 250 for 1 people", "target": "search|masala dosa|1|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 1 people under 250", "target": "search|masala dosa|1|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of masala dosa below 250", "target": "search|masala dosa|1|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 masala dosa under 400", "target": "search|masala dosa|1|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 1 people below 400", "target": "search|masala dosa|1|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 masala dosa kavali 400 lopu", "target": "search|masala dosa|1|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 masala dosa chahiye 400 ke andar", "target": "search|masala dosa|1|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 400 for 1 people", "target": "search|masala dosa|1|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 1 people under 400", "target": "search|masala dosa|1|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of masala dosa below 400", "target": "search|masala dosa|1|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 masala dosa under 150", "target": "search|masala dosa|2|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 2 people below 150", "target": "search|masala dosa|2|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 masala dosa kavali 150 lopu", "target": "search|masala dosa|2|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 masala dosa chahiye 150 ke andar", "target": "search|masala dosa|2|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 150 for 2 people", "target": "search|masala dosa|2|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 2 people under 150", "target": "search|masala dosa|2|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of masala dosa below 150", "target": "search|masala dosa|2|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 masala dosa under 250", "target": "search|masala dosa|2|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 2 people below 250", "target": "search|masala dosa|2|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 masala dosa kavali 250 lopu", "target": "search|masala dosa|2|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 masala dosa chahiye 250 ke andar", "target": "search|masala dosa|2|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 250 for 2 people", "target": "search|masala dosa|2|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 2 people under 250", "target": "search|masala dosa|2|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of masala dosa below 250", "target": "search|masala dosa|2|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 masala dosa under 400", "target": "search|masala dosa|2|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 2 people below 400", "target": "search|masala dosa|2|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 masala dosa kavali 400 lopu", "target": "search|masala dosa|2|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 masala dosa chahiye 400 ke andar", "target": "search|masala dosa|2|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 400 for 2 people", "target": "search|masala dosa|2|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 2 people under 400", "target": "search|masala dosa|2|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of masala dosa below 400", "target": "search|masala dosa|2|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 masala dosa under 150", "target": "search|masala dosa|3|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 3 people below 150", "target": "search|masala dosa|3|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 masala dosa kavali 150 lopu", "target": "search|masala dosa|3|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 masala dosa chahiye 150 ke andar", "target": "search|masala dosa|3|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 150 for 3 people", "target": "search|masala dosa|3|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 3 people under 150", "target": "search|masala dosa|3|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of masala dosa below 150", "target": "search|masala dosa|3|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 masala dosa under 250", "target": "search|masala dosa|3|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 3 people below 250", "target": "search|masala dosa|3|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 masala dosa kavali 250 lopu", "target": "search|masala dosa|3|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 masala dosa chahiye 250 ke andar", "target": "search|masala dosa|3|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 250 for 3 people", "target": "search|masala dosa|3|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 3 people under 250", "target": "search|masala dosa|3|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of masala dosa below 250", "target": "search|masala dosa|3|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 masala dosa under 400", "target": "search|masala dosa|3|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 3 people below 400", "target": "search|masala dosa|3|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 masala dosa kavali 400 lopu", "target": "search|masala dosa|3|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 masala dosa chahiye 400 ke andar", "target": "search|masala dosa|3|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 400 for 3 people", "target": "search|masala dosa|3|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 3 people under 400", "target": "search|masala dosa|3|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of masala dosa below 400", "target": "search|masala dosa|3|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 masala dosa under 150", "target": "search|masala dosa|4|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 4 people below 150", "target": "search|masala dosa|4|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 masala dosa kavali 150 lopu", "target": "search|masala dosa|4|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 masala dosa chahiye 150 ke andar", "target": "search|masala dosa|4|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 150 for 4 people", "target": "search|masala dosa|4|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 4 people under 150", "target": "search|masala dosa|4|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of masala dosa below 150", "target": "search|masala dosa|4|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 masala dosa under 250", "target": "search|masala dosa|4|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 4 people below 250", "target": "search|masala dosa|4|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 masala dosa kavali 250 lopu", "target": "search|masala dosa|4|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 masala dosa chahiye 250 ke andar", "target": "search|masala dosa|4|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 250 for 4 people", "target": "search|masala dosa|4|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 4 people under 250", "target": "search|masala dosa|4|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of masala dosa below 250", "target": "search|masala dosa|4|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 masala dosa under 400", "target": "search|masala dosa|4|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "masala dosa for 4 people below 400", "target": "search|masala dosa|4|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 masala dosa kavali 400 lopu", "target": "search|masala dosa|4|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 masala dosa chahiye 400 ke andar", "target": "search|masala dosa|4|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find masala dosa under 400 for 4 people", "target": "search|masala dosa|4|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order masala dosa for 4 people under 400", "target": "search|masala dosa|4|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of masala dosa below 400", "target": "search|masala dosa|4|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "I want egg biryani", "target": "search|egg biryani|||", "family": "search:0", "split": "train", "synthetic": true}
+{"text": "please find egg biryani", "target": "search|egg biryani|||", "family": "search:1", "split": "train", "synthetic": true}
+{"text": "show me egg biryani", "target": "search|egg biryani|||", "family": "search:2", "split": "test", "synthetic": true}
+{"text": "egg biryani kavali", "target": "search|egg biryani|||", "family": "search:3", "split": "train", "synthetic": true}
+{"text": "naaku egg biryani ivvandi", "target": "search|egg biryani|||", "family": "search:4", "split": "test", "synthetic": true}
+{"text": "egg biryani chahiye", "target": "search|egg biryani|||", "family": "search:5", "split": "train", "synthetic": true}
+{"text": "mujhe egg biryani do", "target": "search|egg biryani|||", "family": "search:6", "split": "train", "synthetic": true}
+{"text": "నాకు ఎగ్ బిర్యానీ కావాలి", "target": "search|egg biryani|||", "family": "search:7", "split": "train", "synthetic": true}
+{"text": "ఎగ్ బిర్యానీ చూపించు", "target": "search|egg biryani|||", "family": "search:8", "split": "train", "synthetic": true}
+{"text": "मुझे अंडा बिरयानी चाहिए", "target": "search|egg biryani|||", "family": "search:9", "split": "train", "synthetic": true}
+{"text": "अंडा बिरयानी दिखाओ", "target": "search|egg biryani|||", "family": "search:10", "split": "train", "synthetic": true}
+{"text": "1 egg biryani under 150", "target": "search|egg biryani|1|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 1 people below 150", "target": "search|egg biryani|1|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 egg biryani kavali 150 lopu", "target": "search|egg biryani|1|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 egg biryani chahiye 150 ke andar", "target": "search|egg biryani|1|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 150 for 1 people", "target": "search|egg biryani|1|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 1 people under 150", "target": "search|egg biryani|1|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of egg biryani below 150", "target": "search|egg biryani|1|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 egg biryani under 250", "target": "search|egg biryani|1|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 1 people below 250", "target": "search|egg biryani|1|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 egg biryani kavali 250 lopu", "target": "search|egg biryani|1|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 egg biryani chahiye 250 ke andar", "target": "search|egg biryani|1|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 250 for 1 people", "target": "search|egg biryani|1|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 1 people under 250", "target": "search|egg biryani|1|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of egg biryani below 250", "target": "search|egg biryani|1|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "1 egg biryani under 400", "target": "search|egg biryani|1|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 1 people below 400", "target": "search|egg biryani|1|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "1 egg biryani kavali 400 lopu", "target": "search|egg biryani|1|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "1 egg biryani chahiye 400 ke andar", "target": "search|egg biryani|1|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 400 for 1 people", "target": "search|egg biryani|1|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 1 people under 400", "target": "search|egg biryani|1|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "1 portions of egg biryani below 400", "target": "search|egg biryani|1|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 egg biryani under 150", "target": "search|egg biryani|2|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 2 people below 150", "target": "search|egg biryani|2|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 egg biryani kavali 150 lopu", "target": "search|egg biryani|2|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 egg biryani chahiye 150 ke andar", "target": "search|egg biryani|2|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 150 for 2 people", "target": "search|egg biryani|2|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 2 people under 150", "target": "search|egg biryani|2|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of egg biryani below 150", "target": "search|egg biryani|2|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 egg biryani under 250", "target": "search|egg biryani|2|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 2 people below 250", "target": "search|egg biryani|2|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 egg biryani kavali 250 lopu", "target": "search|egg biryani|2|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 egg biryani chahiye 250 ke andar", "target": "search|egg biryani|2|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 250 for 2 people", "target": "search|egg biryani|2|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 2 people under 250", "target": "search|egg biryani|2|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of egg biryani below 250", "target": "search|egg biryani|2|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "2 egg biryani under 400", "target": "search|egg biryani|2|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 2 people below 400", "target": "search|egg biryani|2|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "2 egg biryani kavali 400 lopu", "target": "search|egg biryani|2|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "2 egg biryani chahiye 400 ke andar", "target": "search|egg biryani|2|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 400 for 2 people", "target": "search|egg biryani|2|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 2 people under 400", "target": "search|egg biryani|2|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "2 portions of egg biryani below 400", "target": "search|egg biryani|2|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 egg biryani under 150", "target": "search|egg biryani|3|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 3 people below 150", "target": "search|egg biryani|3|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 egg biryani kavali 150 lopu", "target": "search|egg biryani|3|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 egg biryani chahiye 150 ke andar", "target": "search|egg biryani|3|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 150 for 3 people", "target": "search|egg biryani|3|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 3 people under 150", "target": "search|egg biryani|3|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of egg biryani below 150", "target": "search|egg biryani|3|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 egg biryani under 250", "target": "search|egg biryani|3|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 3 people below 250", "target": "search|egg biryani|3|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 egg biryani kavali 250 lopu", "target": "search|egg biryani|3|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 egg biryani chahiye 250 ke andar", "target": "search|egg biryani|3|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 250 for 3 people", "target": "search|egg biryani|3|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 3 people under 250", "target": "search|egg biryani|3|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of egg biryani below 250", "target": "search|egg biryani|3|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "3 egg biryani under 400", "target": "search|egg biryani|3|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 3 people below 400", "target": "search|egg biryani|3|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "3 egg biryani kavali 400 lopu", "target": "search|egg biryani|3|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "3 egg biryani chahiye 400 ke andar", "target": "search|egg biryani|3|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 400 for 3 people", "target": "search|egg biryani|3|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 3 people under 400", "target": "search|egg biryani|3|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "3 portions of egg biryani below 400", "target": "search|egg biryani|3|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 egg biryani under 150", "target": "search|egg biryani|4|150|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 4 people below 150", "target": "search|egg biryani|4|150|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 egg biryani kavali 150 lopu", "target": "search|egg biryani|4|150|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 egg biryani chahiye 150 ke andar", "target": "search|egg biryani|4|150|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 150 for 4 people", "target": "search|egg biryani|4|150|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 4 people under 150", "target": "search|egg biryani|4|150|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of egg biryani below 150", "target": "search|egg biryani|4|150|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 egg biryani under 250", "target": "search|egg biryani|4|250|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 4 people below 250", "target": "search|egg biryani|4|250|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 egg biryani kavali 250 lopu", "target": "search|egg biryani|4|250|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 egg biryani chahiye 250 ke andar", "target": "search|egg biryani|4|250|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 250 for 4 people", "target": "search|egg biryani|4|250|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 4 people under 250", "target": "search|egg biryani|4|250|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of egg biryani below 250", "target": "search|egg biryani|4|250|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "4 egg biryani under 400", "target": "search|egg biryani|4|400|", "family": "slots:0", "split": "train", "synthetic": true}
+{"text": "egg biryani for 4 people below 400", "target": "search|egg biryani|4|400|", "family": "slots:1", "split": "test", "synthetic": true}
+{"text": "4 egg biryani kavali 400 lopu", "target": "search|egg biryani|4|400|", "family": "slots:2", "split": "train", "synthetic": true}
+{"text": "4 egg biryani chahiye 400 ke andar", "target": "search|egg biryani|4|400|", "family": "slots:3", "split": "train", "synthetic": true}
+{"text": "please find egg biryani under 400 for 4 people", "target": "search|egg biryani|4|400|", "family": "slots:4", "split": "train", "synthetic": true}
+{"text": "order egg biryani for 4 people under 400", "target": "search|egg biryani|4|400|", "family": "slots:5", "split": "train", "synthetic": true}
+{"text": "4 portions of egg biryani below 400", "target": "search|egg biryani|4|400|", "family": "slots:6", "split": "train", "synthetic": true}
+{"text": "for 1 people", "target": "quantity||1||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "1 members ki", "target": "quantity||1||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "1 logon ke liye", "target": "quantity||1||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "for 2 people", "target": "quantity||2||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "2 members ki", "target": "quantity||2||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "2 logon ke liye", "target": "quantity||2||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "for 3 people", "target": "quantity||3||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "3 members ki", "target": "quantity||3||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "3 logon ke liye", "target": "quantity||3||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "for 4 people", "target": "quantity||4||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "4 members ki", "target": "quantity||4||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "4 logon ke liye", "target": "quantity||4||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "for 5 people", "target": "quantity||5||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "5 members ki", "target": "quantity||5||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "5 logon ke liye", "target": "quantity||5||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "for 6 people", "target": "quantity||6||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "6 members ki", "target": "quantity||6||", "family": "quantity", "split": "train", "synthetic": true}
+{"text": "6 logon ke liye", "target": "quantity||6||", "family": "quantity", "split": "train", "synthetic": true}

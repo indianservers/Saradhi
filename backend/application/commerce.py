@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from ai_platform.inference.service import preparation_rule
 from backend.application import batches
 from backend.application.common import add, audit, branch_scope, event, now, owned
+from backend.application.customer_options import priced_options
 from backend.domain.rules import BusinessError, money, transition
 from backend.persistence import models as m
 from backend.persistence.foundations import FOUNDATION_MODELS as F
@@ -164,7 +165,17 @@ async def add_item(session, actor, cart_id, values):
     window = await Repository(session).require(m.Window, values.window_id)
     if window.branch_id != values.branch_id:
         raise BusinessError("invalid_window", "Window belongs to another branch", 422)
-    item = await add(session, m.CartItem, cart_id=cart.id, **values.model_dump())
+    item = await add(
+        session, m.CartItem, cart_id=cart.id, **values.model_dump(exclude={"option_ids"})
+    )
+    for option_id in set(values.option_ids):
+        await add(
+            session,
+            F["commerce.cart_item_options"],
+            cart_item_id=item.id,
+            option_id=option_id,
+            quantity=1,
+        )
     cart.version += 1
     return item
 
@@ -195,9 +206,8 @@ async def make_quote(session, actor, cart_id):
             await session.scalars(select(m.Address).where(m.Address.id.in_(address_ids)))
         ).all()
     }
-    Availability, Options, Tax = (
+    Availability, Tax = (
         F["catalog.product_branch_availability"],
-        F["commerce.cart_item_options"],
         F["catalog.product_tax_categories"],
     )
     availability_map = {
@@ -213,15 +223,6 @@ async def make_quote(session, actor, cart_id):
     taxable = set(
         (await session.scalars(select(Tax.product_id).where(Tax.product_id.in_(product_ids)))).all()
     )
-    if await session.scalar(
-        select(Options.id)
-        .join(m.CartItem, Options.cart_item_id == m.CartItem.id)
-        .where(m.CartItem.cart_id == cart.id)
-        .limit(1)
-    ):
-        raise BusinessError(
-            "options_not_priced", "Option pricing must be implemented before customized checkout"
-        )
     earliest = min(window.starts_at for *_, window in rows)
     latest = max(window.starts_at for *_, window in rows)
     candidate_prices = (
@@ -295,7 +296,8 @@ async def make_quote(session, actor, cart_id):
         price = prices[0]
         currency = currency_map[price.currency]
         currencies.add(price.currency)
-        amount = money(price.amount * item.quantity, currency.scale)
+        option_amount, addons = await priced_options(session, product, item)
+        amount = money((price.amount + option_amount) * item.quantity, currency.scale)
         lines.append(
             {
                 "cart_item_id": str(item.id),
@@ -313,7 +315,8 @@ async def make_quote(session, actor, cart_id):
                 "total": str(amount),
                 "window_id": str(window.id),
                 "delivery_method": item.delivery_method,
-                "addons": [],
+                "addons": addons,
+                "preparation_notes": item.preparation_notes,
                 "discounts": [],
                 "taxes": [],
                 "address": {
@@ -328,7 +331,19 @@ async def make_quote(session, actor, cart_id):
         )
     if len(currencies) != 1:
         raise BusinessError("mixed_currency_checkout", "Split checkout by currency", 422)
-    total = sum((Decimal(line["total"]) for line in lines), Decimal(0))
+    from backend.application.checkout_groups import delivery_rates, group_deliveries
+
+    branches = {branch.id: branch for _, _, _, branch, _ in rows}
+    windows = {window.id: window for _, _, _, _, window in rows}
+    currency = currency_map[next(iter(currencies))]
+    delivery_branches = {
+        UUID(line["branch_id"]): branches[UUID(line["branch_id"])]
+        for line in lines
+        if line["delivery_method"] != "pickup"
+    }
+    rates = await delivery_rates(session, delivery_branches, currency) if delivery_branches else {}
+    shipments = group_deliveries(lines, branches, windows, rates, currency.scale)
+    total = sum((Decimal(group["total"]) for group in shipments), Decimal(0))
     quote = await add(
         session,
         m.Quote,
@@ -337,7 +352,7 @@ async def make_quote(session, actor, cart_id):
         cart_version=cart.version,
         currency=next(iter(currencies)),
         total=total,
-        snapshot={"lines": lines},
+        snapshot={"lines": lines, "shipments": shipments},
         expires_at=now() + timedelta(minutes=5),
     )
     return quote
@@ -414,6 +429,19 @@ async def confirm(session, actor, quote_id, key, request_id):
         currency=quote.currency,
         total=quote.total,
     )
+    delivery_amount = sum(
+        (Decimal(s["delivery_fee"]) for s in quote.snapshot.get("shipments", [])), Decimal(0)
+    )
+    if delivery_amount:
+        currency = await session.scalar(select(m.Currency).where(m.Currency.code == quote.currency))
+        await add(
+            session,
+            F["commerce.order_amount_breakdowns"],
+            order_id=order.id,
+            currency_id=currency.id,
+            kind="delivery",
+            amount=delivery_amount,
+        )
     merchant_orders = {}
     for (branch_id, window_id, method, _), group in groups.items():
         if branch_id not in merchant_orders:

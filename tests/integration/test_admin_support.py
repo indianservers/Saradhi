@@ -23,6 +23,20 @@ async def test_support_claim_reply_and_resolve_are_owned_and_audited(api):
     )
     assert created.status_code == 201, created.text
     ticket_id = created.json()["id"]
+    own_tickets = await client.get("/api/v1/me/support/tickets", headers=customer["headers"])
+    assert own_tickets.status_code == 200, own_tickets.text
+    assert [row["id"] for row in own_tickets.json()["items"]] == [ticket_id]
+    assert own_tickets.json()["items"][0]["status"] == "open"
+    assert "assigned_to_id" not in own_tickets.json()["items"][0]
+    other_customer = await user(client, app)
+    other_tickets = await client.get(
+        "/api/v1/me/support/tickets", headers=other_customer["headers"]
+    )
+    assert other_tickets.status_code == 200 and other_tickets.json()["items"] == []
+    guessed_messages = await client.get(
+        f"/api/v1/me/support/tickets/{ticket_id}/messages", headers=other_customer["headers"]
+    )
+    assert guessed_messages.status_code == 404
     customer_message = await client.post(
         f"/api/v1/support/tickets/{ticket_id}/messages",
         json={"body": "One item was missing from the bag."},
@@ -62,6 +76,22 @@ async def test_support_claim_reply_and_resolve_are_owned_and_audited(api):
         headers=agent["headers"],
     )
     assert reply.status_code == 201, reply.text
+    customer_conversation = await client.get(
+        f"/api/v1/me/support/tickets/{ticket_id}/messages?limit=1",
+        headers=customer["headers"],
+    )
+    assert customer_conversation.status_code == 200, customer_conversation.text
+    assert [row["author"] for row in customer_conversation.json()["items"]] == ["you"]
+    assert customer_conversation.json()["next_cursor"]
+    assert all("author_id" not in row for row in customer_conversation.json()["items"])
+    next_page = await client.get(
+        f"/api/v1/me/support/tickets/{ticket_id}/messages",
+        params={"limit": 1, "cursor": customer_conversation.json()["next_cursor"]},
+        headers=customer["headers"],
+    )
+    assert next_page.status_code == 200, next_page.text
+    assert [row["author"] for row in next_page.json()["items"]] == ["support"]
+    assert next_page.json()["next_cursor"] is None
     resolved = await client.post(
         f"/api/v1/support/tickets/{ticket_id}/resolve", headers=agent["headers"]
     )

@@ -1,3 +1,4 @@
+import ipaddress
 from functools import lru_cache
 from typing import Literal
 
@@ -48,6 +49,9 @@ class Settings(BaseSettings):
     razorpay_live_approval: bool = False
     otp_pepper: SecretStr = SecretStr("")
     auth_rate_limit_per_minute: int = Field(default=20, ge=1, le=10000)
+    api_requests_per_minute: int = Field(default=600, ge=30, le=100000)
+    max_request_body_bytes: int = Field(default=6 * 1024 * 1024, ge=1024, le=10 * 1024 * 1024)
+    trusted_proxy_cidrs: list[str] = []
     pilot_location_fresh_seconds: int = Field(default=90, ge=15, le=300)
     pilot_location_history_interval_seconds: int = Field(default=15, ge=5, le=300)
     pilot_location_retention_days: int = Field(default=7, ge=1, le=30)
@@ -73,6 +77,11 @@ class Settings(BaseSettings):
             raise ValueError("Use a dedicated quickbuddy_dev or quickbuddy_test database")
         if any("*" in origin for origin in self.cors_origins):
             raise ValueError("Explicit CORS origins required")
+        try:
+            for proxy_cidr in self.trusted_proxy_cidrs:
+                ipaddress.ip_network(proxy_cidr, strict=False)
+        except ValueError as exc:
+            raise ValueError("TRUSTED_PROXY_CIDRS must contain valid IP networks") from exc
         if self.app_env in {"staging", "production"}:
             if self.auth_private_key_path:
                 raise ValueError("Local password authentication is forbidden in staging/production")

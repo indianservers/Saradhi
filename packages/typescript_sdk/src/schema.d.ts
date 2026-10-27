@@ -858,6 +858,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/orders/{order_id}/reviewable-items": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Reviewable Order Items */
+    get: operations["reviewable_order_items_api_v1_orders__order_id__reviewable_items_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/order-items/{order_item_id}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Submit Order Item Review */
+    post: operations["submit_order_item_review_api_v1_order_items__order_item_id__review_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/orders/{order_id}/payment": {
     parameters: {
       query?: never;
@@ -2252,6 +2286,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/me/support/tickets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * My Support Tickets
+     * @description Return only the authenticated customer's own support cases.
+     */
+    get: operations["my_support_tickets_api_v1_me_support_tickets_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/me/support/tickets/{ticket_id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * My Support Ticket Messages
+     * @description Read a customer's own conversation without exposing support-agent identities.
+     */
+    get: operations["my_support_ticket_messages_api_v1_me_support_tickets__ticket_id__messages_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/audit/events": {
     parameters: {
       query?: never;
@@ -2868,6 +2942,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/channel/merchant-orders/{order_id}/items": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Merchant Items */
+    get: operations["merchant_items_api_v1_channel_merchant_orders__order_id__items_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/channel/products/{product_id}/details": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Write Details */
+    put: operations["write_details_api_v1_channel_products__product_id__details_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/channel/catalog": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Catalog */
+    get: operations["catalog_api_v1_channel_catalog_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/channel/branches/{branch_id}/delivery-fee": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Set Delivery Fee */
+    put: operations["set_delivery_fee_api_v1_channel_branches__branch_id__delivery_fee_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3073,6 +3215,13 @@ export interface components {
       /** Expected Version */
       expected_version: number;
     };
+    /** BranchDeliveryFee */
+    BranchDeliveryFee: {
+      /** Amount */
+      amount: number | string;
+      /** Currency */
+      currency: string;
+    };
     /** BranchIn */
     BranchIn: {
       /** Name */
@@ -3218,6 +3367,13 @@ export interface components {
        * @enum {string}
        */
       delivery_method: "pickup" | "courier" | "merchant_delivery";
+      /** Option Ids */
+      option_ids?: string[];
+      /**
+       * Preparation Notes
+       * @default
+       */
+      preparation_notes: string;
     };
     /** CartItemOut */
     CartItemOut: {
@@ -3252,6 +3408,11 @@ export interface components {
       window_id: string;
       /** Delivery Method */
       delivery_method: string;
+      /**
+       * Preparation Notes
+       * @default
+       */
+      preparation_notes: string;
       /** Product Name */
       product_name?: string | null;
       /** Variant Name */
@@ -3315,6 +3476,13 @@ export interface components {
       available_quantity: string;
       /** Serviceable */
       serviceable?: boolean | null;
+      /** Average Rating */
+      average_rating?: string | null;
+      /**
+       * Review Count
+       * @default 0
+       */
+      review_count: number;
     };
     /** CategoryIn */
     CategoryIn: {
@@ -3442,6 +3610,31 @@ export interface components {
       /** Policy Version */
       policy_version: string;
     };
+    /** CustomerProductRatingIn */
+    CustomerProductRatingIn: {
+      /** Rating */
+      rating: number;
+    };
+    /** CustomerReviewOut */
+    CustomerReviewOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Order Item Id
+       * Format: uuid
+       */
+      order_item_id: string;
+      /** Rating */
+      rating: number;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
     /** CustomerSegmentConditionIn */
     CustomerSegmentConditionIn: {
       /**
@@ -3479,6 +3672,45 @@ export interface components {
       logic: "and" | "or";
       /** Conditions */
       conditions: components["schemas"]["CustomerSegmentConditionIn"][];
+    };
+    /** CustomerTicketMessageOut */
+    CustomerTicketMessageOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Author
+       * @enum {string}
+       */
+      author: "you" | "support";
+      /** Body */
+      body: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** CustomerTicketOut */
+    CustomerTicketOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Subject */
+      subject: string;
+      /** Status */
+      status: string;
+      /** Order Id */
+      order_id: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
     };
     /** DispatchOptimizeIn */
     DispatchOptimizeIn: {
@@ -3982,6 +4214,30 @@ export interface components {
       /** Pilot Id */
       pilot_id?: string | null;
     };
+    /** OptionGroup */
+    OptionGroup: {
+      /** Name */
+      name: string;
+      /**
+       * Minimum
+       * @default 0
+       */
+      minimum: number;
+      /**
+       * Maximum
+       * @default 1
+       */
+      maximum: number;
+      /** Values */
+      values: components["schemas"]["OptionValue"][];
+    };
+    /** OptionValue */
+    OptionValue: {
+      /** Name */
+      name: string;
+      /** Price Delta */
+      price_delta: number | string;
+    };
     /** OrderOut */
     OrderOut: {
       /**
@@ -4071,6 +4327,20 @@ export interface components {
       /** Next Cursor */
       next_cursor?: string | null;
     };
+    /** Page[CustomerTicketMessageOut] */
+    Page_CustomerTicketMessageOut_: {
+      /** Items */
+      items: components["schemas"]["CustomerTicketMessageOut"][];
+      /** Next Cursor */
+      next_cursor?: string | null;
+    };
+    /** Page[CustomerTicketOut] */
+    Page_CustomerTicketOut_: {
+      /** Items */
+      items: components["schemas"]["CustomerTicketOut"][];
+      /** Next Cursor */
+      next_cursor?: string | null;
+    };
     /** Page[HistoryOut] */
     Page_HistoryOut_: {
       /** Items */
@@ -4117,6 +4387,13 @@ export interface components {
     Page_PriceOut_: {
       /** Items */
       items: components["schemas"]["PriceOut"][];
+      /** Next Cursor */
+      next_cursor?: string | null;
+    };
+    /** Page[ReviewableOrderItemOut] */
+    Page_ReviewableOrderItemOut_: {
+      /** Items */
+      items: components["schemas"]["ReviewableOrderItemOut"][];
       /** Next Cursor */
       next_cursor?: string | null;
     };
@@ -4298,6 +4575,24 @@ export interface components {
       /** Roles */
       roles: string[];
     };
+    /** ProductDetails */
+    ProductDetails: {
+      /** Ingredients */
+      ingredients?: string[] | null;
+      /** Image Url */
+      image_url?: string | null;
+      /** Dietary */
+      dietary?: ("vegetarian" | "vegan" | "gluten_free" | "halal" | "jain")[];
+      /** Allergens */
+      allergens?: string[];
+      /**
+       * Allergens Reviewed
+       * @default false
+       */
+      allergens_reviewed: boolean;
+      /** Groups */
+      groups?: components["schemas"]["OptionGroup"][];
+    };
     /** ProductIn */
     ProductIn: {
       /** Name */
@@ -4359,6 +4654,11 @@ export interface components {
     };
     /** QuoteLineOut */
     QuoteLineOut: {
+      /**
+       * Cart Item Id
+       * Format: uuid
+       */
+      cart_item_id: string;
       /** Product Name */
       product_name: string;
       /** Variant Name */
@@ -4385,6 +4685,15 @@ export interface components {
       window_id: string;
       /** Delivery Method */
       delivery_method: string;
+      /** Addons */
+      addons?: {
+        [key: string]: unknown;
+      }[];
+      /**
+       * Preparation Notes
+       * @default
+       */
+      preparation_notes: string;
       /** Branch Name */
       branch_name?: string | null;
       /** Window Starts At */
@@ -4417,6 +4726,55 @@ export interface components {
       expires_at: string;
       /** Lines */
       lines?: components["schemas"]["QuoteLineOut"][];
+      /** Breakdown */
+      breakdown?: {
+        [key: string]: string | null;
+      };
+      /** Shipments */
+      shipments?: components["schemas"]["QuoteShipmentOut"][];
+    };
+    /** QuoteShipmentOut */
+    QuoteShipmentOut: {
+      /**
+       * Branch Id
+       * Format: uuid
+       */
+      branch_id: string;
+      /** Branch Name */
+      branch_name: string;
+      /**
+       * Window Id
+       * Format: uuid
+       */
+      window_id: string;
+      /** Delivery Method */
+      delivery_method: string;
+      /** Line Ids */
+      line_ids: string[];
+      /** Items */
+      items: string;
+      /** Extras */
+      extras: string;
+      /** Delivery Fee */
+      delivery_fee: string;
+      /** Taxes */
+      taxes: string;
+      /** Discounts */
+      discounts: string;
+      /** Total */
+      total: string;
+      /**
+       * Estimated Arrival Start
+       * Format: date-time
+       */
+      estimated_arrival_start: string;
+      /**
+       * Estimated Arrival End
+       * Format: date-time
+       */
+      estimated_arrival_end: string;
+      /** Estimate Basis */
+      estimate_basis: string;
     };
     /** RazorpayVerifyIn */
     RazorpayVerifyIn: {
@@ -4574,6 +4932,20 @@ export interface components {
       delivery_method: string;
       /** Address Id */
       address_id?: string | null;
+    };
+    /** ReviewableOrderItemOut */
+    ReviewableOrderItemOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Product Name */
+      product_name: string;
+      /** Variant Name */
+      variant_name: string;
+      /** Rating */
+      rating: number | null;
     };
     /** ServiceabilityIn */
     ServiceabilityIn: {
@@ -7960,6 +8332,9 @@ export interface operations {
         branch_id?: string | null;
         category_id?: string | null;
         merchant_type?: string | null;
+        branch_name?: string | null;
+        max_price?: number | string | null;
+        dietary?: string[] | null;
         q?: string | null;
         cursor?: string | null;
         limit?: number;
@@ -9544,6 +9919,165 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["OrderOut"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  reviewable_order_items_api_v1_orders__order_id__reviewable_items_get: {
+    parameters: {
+      query?: {
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        order_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Page_ReviewableOrderItemOut_"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  submit_order_item_review_api_v1_order_items__order_item_id__review_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        order_item_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CustomerProductRatingIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CustomerReviewOut"];
         };
       };
       /** @description Unauthorized */
@@ -16266,6 +16800,162 @@ export interface operations {
       };
     };
   };
+  my_support_tickets_api_v1_me_support_tickets_get: {
+    parameters: {
+      query?: {
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Page_CustomerTicketOut_"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  my_support_ticket_messages_api_v1_me_support_tickets__ticket_id__messages_get: {
+    parameters: {
+      query?: {
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        ticket_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Page_CustomerTicketMessageOut_"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   audit_events_api_v1_audit_events_get: {
     parameters: {
       query: {
@@ -19078,6 +19768,321 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["CustomerSegmentPreviewIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  merchant_items_api_v1_channel_merchant_orders__order_id__items_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        order_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  write_details_api_v1_channel_products__product_id__details_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        product_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProductDetails"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  catalog_api_v1_channel_catalog_get: {
+    parameters: {
+      query?: {
+        city_id?: string | null;
+        branch_id?: string | null;
+        cursor?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  set_delivery_fee_api_v1_channel_branches__branch_id__delivery_fee_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        branch_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BranchDeliveryFee"];
       };
     };
     responses: {

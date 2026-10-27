@@ -16,6 +16,8 @@ Collection limits are 1..100, cursors opaque, and sort/filter predicates are all
 - `POST /api/v1/auth/logout` — Logout. Bearer plus resource/scope authorization.
 - `GET /api/v1/roles` — Roles. Bearer plus resource/scope authorization.
 - `GET /api/v1/memberships` — Memberships. Bearer plus resource/scope authorization.
+- `GET /api/v1/me/consents` — Customer Consent State. Bearer plus resource/scope authorization.
+- `POST /api/v1/me/consents` — Record Customer Consent. Bearer plus resource/scope authorization.
 - `POST /api/v1/auth/challenges` — Challenge. Bearer plus resource/scope authorization.
 - `POST /api/v1/auth/challenges/{challenge_id}/consume` — Consume Challenge. Bearer plus resource/scope authorization.
 - `POST /api/v1/organizations` — Organization. Bearer plus resource/scope authorization.
@@ -25,7 +27,12 @@ Collection limits are 1..100, cursors opaque, and sort/filter predicates are all
 - `GET /api/v1/geo/countries` — Countries. Public transport; endpoint-specific rate/provider verification applies.
 - `POST /api/v1/geo/cities` — City. Bearer plus resource/scope authorization.
 - `GET /api/v1/geo/cities` — Cities. Public transport; endpoint-specific rate/provider verification applies.
+- `GET /api/v1/operations/authorized-cities` — Authorized Cities. Bearer plus resource/scope authorization.
 - `POST /api/v1/geo/zones` — Zone. Bearer plus resource/scope authorization.
+- `PUT /api/v1/geo/zones/{zone_id}/categories` — Set Zone Category. Bearer plus resource/scope authorization.
+- `GET /api/v1/operations/cities/{city_id}/readiness` — Get City Readiness. Bearer plus resource/scope authorization.
+- `POST /api/v1/operations/cities/{city_id}/activate` — Activate City. Bearer plus resource/scope authorization.
+- `POST /api/v1/operations/cities/{city_id}/suspend` — Suspend City. Bearer plus resource/scope authorization.
 - `POST /api/v1/addresses` — Address. Bearer plus resource/scope authorization.
 - `GET /api/v1/addresses` — Addresses. Bearer plus resource/scope authorization.
 - `POST /api/v1/merchants/brands` — Brand. Bearer plus resource/scope authorization.
@@ -60,6 +67,8 @@ Collection limits are 1..100, cursors opaque, and sort/filter predicates are all
 - `POST /api/v1/orders/confirm` — Confirm. Bearer plus resource/scope authorization.
 - `GET /api/v1/orders` — Orders. Bearer plus resource/scope authorization.
 - `GET /api/v1/orders/{order_id}` — Order. Bearer plus resource/scope authorization.
+- `GET /api/v1/orders/{order_id}/reviewable-items` — Reviewable Order Items. Bearer plus resource/scope authorization.
+- `POST /api/v1/order-items/{order_item_id}/review` — Submit Order Item Review. Bearer plus resource/scope authorization.
 - `GET /api/v1/orders/{order_id}/payment` — Order Payment. Bearer plus resource/scope authorization.
 - `GET /api/v1/orders/{order_id}/merchant-orders` — Children. Bearer plus resource/scope authorization.
 - `GET /api/v1/orders/{order_id}/reorder-lines` — Reorder Lines. Bearer plus resource/scope authorization.
@@ -112,12 +121,23 @@ Collection limits are 1..100, cursors opaque, and sort/filter predicates are all
 - `GET /api/v1/ai/models/{model_id}/metrics` — Ai Model Metrics. Bearer plus resource/scope authorization.
 - `POST /api/v1/ai/models/{model_id}/evaluate` — Ai Evaluate Model. Bearer plus resource/scope authorization.
 - `GET /api/v1/ai/copilot/status` — Ai Copilot Status. Bearer plus resource/scope authorization.
+- `POST /api/v1/ai/agents/{agent}/query` — Ai Agent Query. Bearer plus resource/scope authorization.
 - `POST /api/v1/ai/copilot/query` — Ai Copilot Query. Bearer plus resource/scope authorization.
+- `GET /api/v1/fulfillment/recurring-plans` — List Recurring Plans. Bearer plus resource/scope authorization.
+- `POST /api/v1/fulfillment/recurring-plans` — Create Recurring Plan. Bearer plus resource/scope authorization.
+- `PUT /api/v1/fulfillment/recurring-plans/{plan_id}/status` — Update Recurring Plan Status. Bearer plus resource/scope authorization.
+- `POST /api/v1/fulfillment/recurring-plans/{plan_id}/skip` — Skip Recurring Date. Bearer plus resource/scope authorization.
+- `GET /api/v1/fulfillment/recurring-plans/{plan_id}/occurrences` — List Recurring Occurrences. Bearer plus resource/scope authorization.
 - `PUT /api/v1/operations/cities/{city_id}/dispatch-policy` — Set Dispatch Policy. Bearer plus resource/scope authorization.
 - `POST /api/v1/operations/dispatch/{task_id}/reassign` — Reassign Delivery. Bearer plus resource/scope authorization.
 - `POST /api/v1/delivery-tasks/{task_id}/pickup` — Pickup. Bearer plus resource/scope authorization.
 - `POST /api/v1/delivery-tasks/{task_id}/fail` — Fail. Bearer plus resource/scope authorization.
 - `POST /api/v1/delivery-tasks/{task_id}/acknowledge` — Acknowledge. Bearer plus resource/scope authorization.
+- `GET /api/v1/payments/configuration` — Payment Configuration. Bearer plus resource/scope authorization.
+- `POST /api/v1/payments/intents` — Create Payment Intent. Bearer plus resource/scope authorization.
+- `POST /api/v1/payments/razorpay/verify` — Verify Razorpay Payment. Bearer plus resource/scope authorization.
+- `POST /api/v1/payments/razorpay/webhook` — Razorpay Webhook. Public transport; endpoint-specific rate/provider verification applies.
+- `GET /api/v1/payments/{payment_id}` — Get Payment. Bearer plus resource/scope authorization.
 - `POST /api/v1/finance/currencies` — Currency. Bearer plus resource/scope authorization.
 - `POST /api/v1/finance/accounts` — Account. Bearer plus resource/scope authorization.
 - `POST /api/v1/organizations/{organization_id}/legal-entities` — Legal Entity. Bearer plus resource/scope authorization.
@@ -129,10 +149,18 @@ Collection limits are 1..100, cursors opaque, and sort/filter predicates are all
 - `POST /api/v1/finance/sandbox/payments/{payment_id}/complete` — Complete Sandbox Payment. Bearer plus resource/scope authorization.
 - `POST /api/v1/finance/sandbox/webhook` — Sandbox Webhook. Public transport; endpoint-specific rate/provider verification applies.
 - `POST /api/v1/finance/sandbox/payments/{payment_id}/refunds` — Refund. Bearer plus resource/scope authorization.
+- `GET /api/v1/support/tickets` — Support Queue. Bearer plus resource/scope authorization.
 - `POST /api/v1/support/tickets` — Ticket. Bearer plus resource/scope authorization.
+- `POST /api/v1/support/tickets/{ticket_id}/claim` — Claim Support Ticket. Bearer plus resource/scope authorization.
+- `GET /api/v1/support/tickets/{ticket_id}/messages` — Support Ticket Messages. Bearer plus resource/scope authorization.
 - `POST /api/v1/support/tickets/{ticket_id}/messages` — Message. Bearer plus resource/scope authorization.
+- `POST /api/v1/support/tickets/{ticket_id}/resolve` — Resolve Support Ticket. Bearer plus resource/scope authorization.
+- `GET /api/v1/me/support/tickets` — My Support Tickets. Bearer plus resource/scope authorization.
+- `GET /api/v1/me/support/tickets/{ticket_id}/messages` — My Support Ticket Messages. Bearer plus resource/scope authorization.
 - `GET /api/v1/audit/events` — Audit Events. Bearer plus resource/scope authorization.
 - `POST /api/v1/finance/refund-approvals` — Request Refund Approval. Bearer plus resource/scope authorization.
+- `GET /api/v1/finance/refund-approvals` — Refund Approval Queue. Bearer plus resource/scope authorization.
+- `GET /api/v1/finance/authorized-organizations` — Finance Organizations. Bearer plus resource/scope authorization.
 - `POST /api/v1/finance/refund-approvals/{approval_id}/decision` — Decide Refund. Bearer plus resource/scope authorization.
 - `GET /api/v1/orders/{order_id}/history` — Order History. Bearer plus resource/scope authorization.
 - `GET /api/v1/orders/{order_id}/delivery-tasks` — Order Tasks. Bearer plus resource/scope authorization.
@@ -140,6 +168,36 @@ Collection limits are 1..100, cursors opaque, and sort/filter predicates are all
 - `POST /api/v1/geo/serviceability` — Serviceability. Bearer plus resource/scope authorization.
 - `POST /api/v1/orders/{order_id}/cancel` — Cancel Order. Bearer plus resource/scope authorization.
 - `GET /api/v1/notifications` — Notifications. Bearer plus resource/scope authorization.
+- `GET /api/v1/bulk/templates/{entity}` — Bulk Template. Public transport; endpoint-specific rate/provider verification applies.
+- `POST /api/v1/bulk/imports` — Create Bulk Import. Bearer plus resource/scope authorization.
+- `POST /api/v1/bulk/imports/{job_id}/mapping` — Map Bulk Import. Bearer plus resource/scope authorization.
+- `POST /api/v1/bulk/imports/{job_id}/validate` — Validate Bulk Import. Bearer plus resource/scope authorization.
+- `POST /api/v1/bulk/imports/{job_id}/dry-run` — Preview Bulk Import. Bearer plus resource/scope authorization.
+- `POST /api/v1/bulk/imports/{job_id}/commit` — Commit Bulk Import. Bearer plus resource/scope authorization.
+- `GET /api/v1/bulk/imports/{job_id}` — Get Bulk Import. Bearer plus resource/scope authorization.
+- `GET /api/v1/bulk/imports/{job_id}/errors` — Get Bulk Import Errors. Bearer plus resource/scope authorization.
+- `GET /api/v1/bulk/jobs` — List Bulk Jobs. Bearer plus resource/scope authorization.
+- `POST /api/v1/bulk/jobs/{job_id}/cancel` — Cancel Bulk Job. Bearer plus resource/scope authorization.
+- `POST /api/v1/bulk/exports` — Export Branches. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers` — Admin Customers. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}` — Admin Customer 360. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/orders` — Admin Customer Orders. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/loyalty` — Admin Customer Loyalty. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/subscriptions` — Admin Customer Subscriptions. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/support` — Admin Customer Support. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/feedback` — Admin Customer Feedback. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/payments` — Admin Customer Payments. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/addresses` — Admin Customer Addresses. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/referrals` — Admin Customer Referrals. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/campaigns` — Admin Customer Campaigns. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/privacy` — Admin Customer Privacy. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers/{customer_id}/security` — Admin Customer Security. Bearer plus resource/scope authorization.
+- `GET /api/v1/admin/customers-export` — Admin Customer Export. Bearer plus resource/scope authorization.
+- `POST /api/v1/admin/customer-segments/preview` — Preview Customer Segment. Bearer plus resource/scope authorization.
+- `GET /api/v1/channel/merchant-orders/{order_id}/items` — Merchant Items. Bearer plus resource/scope authorization.
+- `PUT /api/v1/channel/products/{product_id}/details` — Write Details. Bearer plus resource/scope authorization.
+- `GET /api/v1/channel/catalog` — Catalog. Bearer plus resource/scope authorization.
+- `PUT /api/v1/channel/branches/{branch_id}/delivery-fee` — Set Delivery Fee. Bearer plus resource/scope authorization.
 
 ## Verification
 
@@ -148,4 +206,4 @@ No default privileged account exists. Provision only a named existing user via t
 Complete real-database examples: tests/integration/helpers.py and test_vertical_slice.py.
 See api-security.md and error-contracts.md for authorization, precision, state and error behavior.
 Sandbox finance requires explicit enabling and never performs a real financial transaction.
-Total documented HTTP operations: 134.
+Total documented HTTP operations: 192.

@@ -4107,6 +4107,63 @@
             }
           },
           {
+            "name": "branch_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Name"
+            }
+          },
+          {
+            "name": "max_price",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0.0
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Price"
+            }
+          },
+          {
+            "name": "dietary",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 6
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dietary"
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -6323,6 +6380,240 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrderOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{order_id}/reviewable-items": {
+      "get": {
+        "tags": [
+          "Customer feedback"
+        ],
+        "summary": "Reviewable Order Items",
+        "operationId": "reviewable_order_items_api_v1_orders__order_id__reviewable_items_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Order Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ReviewableOrderItemOut_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/order-items/{order_item_id}/review": {
+      "post": {
+        "tags": [
+          "Customer feedback"
+        ],
+        "summary": "Submit Order Item Review",
+        "operationId": "submit_order_item_review_api_v1_order_items__order_item_id__review_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Order Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerProductRatingIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerReviewOut"
                 }
               }
             }
@@ -14989,6 +15280,250 @@
         }
       }
     },
+    "/api/v1/me/support/tickets": {
+      "get": {
+        "tags": [
+          "Customer support"
+        ],
+        "summary": "My Support Tickets",
+        "description": "Return only the authenticated customer's own support cases.",
+        "operationId": "my_support_tickets_api_v1_me_support_tickets_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CustomerTicketOut_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/me/support/tickets/{ticket_id}/messages": {
+      "get": {
+        "tags": [
+          "Customer support"
+        ],
+        "summary": "My Support Ticket Messages",
+        "description": "Read a customer's own conversation without exposing support-agent identities.",
+        "operationId": "my_support_ticket_messages_api_v1_me_support_tickets__ticket_id__messages_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CustomerTicketMessageOut_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
     "/api/v1/audit/events": {
       "get": {
         "tags": [
@@ -18984,6 +19519,462 @@
           }
         ]
       }
+    },
+    "/api/v1/channel/merchant-orders/{order_id}/items": {
+      "get": {
+        "tags": [
+          "Customer channels"
+        ],
+        "summary": "Merchant Items",
+        "operationId": "merchant_items_api_v1_channel_merchant_orders__order_id__items_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/channel/products/{product_id}/details": {
+      "put": {
+        "tags": [
+          "Customer channels"
+        ],
+        "summary": "Write Details",
+        "operationId": "write_details_api_v1_channel_products__product_id__details_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductDetails"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/channel/catalog": {
+      "get": {
+        "tags": [
+          "Customer channels"
+        ],
+        "summary": "Catalog",
+        "operationId": "catalog_api_v1_channel_catalog_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "city_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "City Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/channel/branches/{branch_id}/delivery-fee": {
+      "put": {
+        "tags": [
+          "Customer channels"
+        ],
+        "summary": "Set Delivery Fee",
+        "operationId": "set_delivery_fee_api_v1_channel_branches__branch_id__delivery_fee_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "branch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Branch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BranchDeliveryFee"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -19480,6 +20471,33 @@
         ],
         "title": "BranchAvailabilityIn"
       },
+      "BranchDeliveryFee": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "title": "BranchDeliveryFee"
+      },
       "BranchIn": {
         "properties": {
           "name": {
@@ -19792,6 +20810,21 @@
             ],
             "title": "Delivery Method",
             "default": "pickup"
+          },
+          "option_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Option Ids"
+          },
+          "preparation_notes": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Preparation Notes",
+            "default": ""
           }
         },
         "additionalProperties": false,
@@ -19850,6 +20883,11 @@
           "delivery_method": {
             "type": "string",
             "title": "Delivery Method"
+          },
+          "preparation_notes": {
+            "type": "string",
+            "title": "Preparation Notes",
+            "default": ""
           },
           "product_name": {
             "anyOf": [
@@ -20006,6 +21044,22 @@
               }
             ],
             "title": "Serviceable"
+          },
+          "average_rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Rating"
+          },
+          "review_count": {
+            "type": "integer",
+            "title": "Review Count",
+            "default": 0
           }
         },
         "type": "object",
@@ -20306,6 +21360,53 @@
         ],
         "title": "CustomerConsentIn"
       },
+      "CustomerProductRatingIn": {
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Rating"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rating"
+        ],
+        "title": "CustomerProductRatingIn"
+      },
+      "CustomerReviewOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "order_item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Order Item Id"
+          },
+          "rating": {
+            "type": "integer",
+            "title": "Rating"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order_item_id",
+          "rating",
+          "created_at"
+        ],
+        "title": "CustomerReviewOut"
+      },
       "CustomerSegmentConditionIn": {
         "properties": {
           "field": {
@@ -20405,6 +21506,83 @@
           "conditions"
         ],
         "title": "CustomerSegmentPreviewIn"
+      },
+      "CustomerTicketMessageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "author": {
+            "type": "string",
+            "enum": [
+              "you",
+              "support"
+            ],
+            "title": "Author"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "author",
+          "body",
+          "created_at"
+        ],
+        "title": "CustomerTicketMessageOut"
+      },
+      "CustomerTicketOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject",
+          "status",
+          "order_id",
+          "created_at"
+        ],
+        "title": "CustomerTicketOut"
       },
       "DispatchOptimizeIn": {
         "properties": {
@@ -21644,6 +22822,73 @@
         "type": "object",
         "title": "OfferIn"
       },
+      "OptionGroup": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "minimum": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Minimum",
+            "default": 0
+          },
+          "maximum": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Maximum",
+            "default": 1
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/OptionValue"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "values"
+        ],
+        "title": "OptionGroup"
+      },
+      "OptionValue": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "price_delta": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Price Delta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "price_delta"
+        ],
+        "title": "OptionValue"
+      },
       "OrderOut": {
         "properties": {
           "id": {
@@ -21925,6 +23170,60 @@
         ],
         "title": "Page[CountryOut]"
       },
+      "Page_CustomerTicketMessageOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerTicketMessageOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[CustomerTicketMessageOut]"
+      },
+      "Page_CustomerTicketOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerTicketOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[CustomerTicketOut]"
+      },
       "Page_HistoryOut_": {
         "properties": {
           "items": {
@@ -22113,6 +23412,33 @@
           "items"
         ],
         "title": "Page[PriceOut]"
+      },
+      "Page_ReviewableOrderItemOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewableOrderItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[ReviewableOrderItemOut]"
       },
       "Page_StateOut_": {
         "properties": {
@@ -22549,6 +23875,77 @@
         ],
         "title": "PrincipalView"
       },
+      "ProductDetails": {
+        "properties": {
+          "ingredients": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "dietary": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "vegetarian",
+                "vegan",
+                "gluten_free",
+                "halal",
+                "jain"
+              ]
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Dietary"
+          },
+          "allergens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Allergens"
+          },
+          "allergens_reviewed": {
+            "type": "boolean",
+            "title": "Allergens Reviewed",
+            "default": false
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/OptionGroup"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "title": "ProductDetails"
+      },
       "ProductIn": {
         "properties": {
           "name": {
@@ -22668,6 +24065,11 @@
       },
       "QuoteLineOut": {
         "properties": {
+          "cart_item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Cart Item Id"
+          },
           "product_name": {
             "type": "string",
             "title": "Product Name"
@@ -22709,6 +24111,19 @@
           "delivery_method": {
             "type": "string",
             "title": "Delivery Method"
+          },
+          "addons": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Addons"
+          },
+          "preparation_notes": {
+            "type": "string",
+            "title": "Preparation Notes",
+            "default": ""
           },
           "branch_name": {
             "anyOf": [
@@ -22759,6 +24174,7 @@
         },
         "type": "object",
         "required": [
+          "cart_item_id",
           "product_name",
           "variant_name",
           "branch_id",
@@ -22803,6 +24219,27 @@
             },
             "type": "array",
             "title": "Lines"
+          },
+          "breakdown": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Breakdown"
+          },
+          "shipments": {
+            "items": {
+              "$ref": "#/components/schemas/QuoteShipmentOut"
+            },
+            "type": "array",
+            "title": "Shipments"
           }
         },
         "type": "object",
@@ -22814,6 +24251,91 @@
           "expires_at"
         ],
         "title": "QuoteOut"
+      },
+      "QuoteShipmentOut": {
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Branch Id"
+          },
+          "branch_name": {
+            "type": "string",
+            "title": "Branch Name"
+          },
+          "window_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Window Id"
+          },
+          "delivery_method": {
+            "type": "string",
+            "title": "Delivery Method"
+          },
+          "line_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Line Ids"
+          },
+          "items": {
+            "type": "string",
+            "title": "Items"
+          },
+          "extras": {
+            "type": "string",
+            "title": "Extras"
+          },
+          "delivery_fee": {
+            "type": "string",
+            "title": "Delivery Fee"
+          },
+          "taxes": {
+            "type": "string",
+            "title": "Taxes"
+          },
+          "discounts": {
+            "type": "string",
+            "title": "Discounts"
+          },
+          "total": {
+            "type": "string",
+            "title": "Total"
+          },
+          "estimated_arrival_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Estimated Arrival Start"
+          },
+          "estimated_arrival_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Estimated Arrival End"
+          },
+          "estimate_basis": {
+            "type": "string",
+            "title": "Estimate Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "branch_id",
+          "branch_name",
+          "window_id",
+          "delivery_method",
+          "line_ids",
+          "items",
+          "extras",
+          "delivery_fee",
+          "taxes",
+          "discounts",
+          "total",
+          "estimated_arrival_start",
+          "estimated_arrival_end",
+          "estimate_basis"
+        ],
+        "title": "QuoteShipmentOut"
       },
       "RazorpayVerifyIn": {
         "properties": {
@@ -23174,6 +24696,42 @@
           "delivery_method"
         ],
         "title": "ReorderLineOut"
+      },
+      "ReviewableOrderItemOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name"
+          },
+          "variant_name": {
+            "type": "string",
+            "title": "Variant Name"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "product_name",
+          "variant_name",
+          "rating"
+        ],
+        "title": "ReviewableOrderItemOut"
       },
       "ServiceabilityIn": {
         "properties": {

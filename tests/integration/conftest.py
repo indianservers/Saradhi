@@ -72,6 +72,7 @@ async def api(database_url):
         sandbox_payments_enabled=True,
         sandbox_webhook_secret="integration-only-secret-not-a-real-payment-provider",
         auth_rate_limit_per_minute=10000,
+        api_requests_per_minute=100000,
         otp_pepper="integration-only-otp-pepper-not-a-live-provider-secret",
     )
     app = create_app(settings)

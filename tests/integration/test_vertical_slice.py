@@ -8,6 +8,8 @@ from time import perf_counter
 from uuid import UUID, uuid4
 
 import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import DBAPIError
 
@@ -393,6 +395,44 @@ async def test_customer_catalog_cart_reload_and_quote_lines(api):
     assert product["name"] == "Integration product"
     assert product["unit_price"] == "10.0000"
     assert product["available_quantity"] == "10.0000"
+    async with app.state.sessions.begin() as db:
+        await add(
+            db,
+            F["catalog.dietary_attributes"],
+            product_id=UUID(product["product_id"]),
+            dietary_code="vegan",
+        )
+    filtered = await client.get(
+        "/api/v1/catalog/products",
+        params={
+            "branch_id": branch["id"],
+            "branch_name": "Integration",
+            "max_price": "10.0000",
+            "dietary": "vegan",
+        },
+        headers=customer["headers"],
+    )
+    assert filtered.status_code == 200, filtered.text
+    assert [row["id"] for row in filtered.json()["items"]] == [product["id"]]
+    merchant_search = await client.get(
+        "/api/v1/catalog/products",
+        params={"q": "Integration branch", "branch_id": branch["id"]},
+        headers=customer["headers"],
+    )
+    assert merchant_search.status_code == 200, merchant_search.text
+    assert [row["id"] for row in merchant_search.json()["items"]] == [product["id"]]
+    over_budget = await client.get(
+        "/api/v1/catalog/products",
+        params={"branch_id": branch["id"], "max_price": "9.99"},
+        headers=customer["headers"],
+    )
+    assert over_budget.status_code == 200 and over_budget.json()["items"] == []
+    bad_filter = await client.get(
+        "/api/v1/catalog/products",
+        params={"branch_id": branch["id"], "dietary": "vegan;select"},
+        headers=customer["headers"],
+    )
+    assert bad_filter.status_code == 422
 
     cart = await post(client, "/carts", None, customer)
     for shop in state["shops"]:
@@ -806,6 +846,45 @@ async def test_merchant_transition_and_recipient_pickup(api):
         200,
     )
     assert delivered["status"] == "delivered"
+    reviewable = await client.get(
+        f"/api/v1/orders/{order['id']}/reviewable-items", headers=state["customer"]["headers"]
+    )
+    assert reviewable.status_code == 200, reviewable.text
+    item = reviewable.json()["items"][0]
+    assert item["rating"] is None
+    submitted = await client.post(
+        f"/api/v1/order-items/{item['id']}/review",
+        json={"rating": 5},
+        headers=state["customer"]["headers"],
+    )
+    assert submitted.status_code == 201, submitted.text
+    retried = await client.post(
+        f"/api/v1/order-items/{item['id']}/review",
+        json={"rating": 5},
+        headers=state["customer"]["headers"],
+    )
+    assert retried.status_code == 201 and retried.json()["id"] == submitted.json()["id"]
+    changed = await client.post(
+        f"/api/v1/order-items/{item['id']}/review",
+        json={"rating": 4},
+        headers=state["customer"]["headers"],
+    )
+    assert changed.status_code == 409
+    cross_customer = await user(client, app)
+    denied_review = await client.post(
+        f"/api/v1/order-items/{item['id']}/review",
+        json={"rating": 1},
+        headers=cross_customer["headers"],
+    )
+    assert denied_review.status_code == 403
+    rated_catalog = await client.get(
+        "/api/v1/catalog/products",
+        params={"branch_id": state["shops"][0]["branch"]["id"]},
+        headers=state["customer"]["headers"],
+    )
+    assert rated_catalog.status_code == 200, rated_catalog.text
+    assert Decimal(rated_catalog.json()["items"][0]["average_rating"]) == Decimal("5")
+    assert rated_catalog.json()["items"][0]["review_count"] == 1
     final = await client.get(f"/api/v1/orders/{order['id']}", headers=state["customer"]["headers"])
     assert final.json()["status"] == "completed"
 
@@ -1404,7 +1483,9 @@ async def test_pagination_validation_and_fresh_migration(api):
     invalid_cursor = await client.get("/api/v1/orders?cursor=invalid", headers=identity["headers"])
     assert invalid_cursor.status_code == 422
     async with app.state.sessions() as db:
-        assert await db.scalar(text("SELECT version_num FROM alembic_version")) == "20261027_0020"
+        version = await db.scalar(text("SELECT version_num FROM alembic_version"))
+        current_head = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+        assert version == current_head
         count = await db.scalar(
             text(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema IN "

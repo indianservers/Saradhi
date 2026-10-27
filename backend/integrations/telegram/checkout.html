@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quickbuddy secure checkout</title>
+<body style="font:18px system-ui;max-width:600px;margin:80px auto;padding:24px">
+<h1>Quickbuddy __MODE__ checkout</h1>
+<p>Payment success is checked by the backend before it is shown as verified.</p>
+<button id="pay" style="padding:16px">Continue to Razorpay</button><p id="status"></p>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script><script>
+const options=__OPTIONS__;
+options.handler=async result=>{
+ document.getElementById('status').textContent='Verifying payment…';
+ try {
+  const r=await fetch(location.pathname+'/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result)});
+  const data=await r.json();
+  document.getElementById('status').textContent=r.ok?data.message:'Verification failed or uncertain. Check order status in Telegram.';
+ } catch(e) {document.getElementById('status').textContent='Verification unavailable. Check order status in Telegram.';}
+};
+document.getElementById('pay').onclick=()=>new Razorpay(options).open();
+</script></body></html>

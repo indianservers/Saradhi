@@ -18,7 +18,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ai_platform.gateway import ModelGateway
+from backend.api.v1.customer_channel import router as customer_channel_router
 from backend.api.v1.routes import router
+from backend.application import identity as identity_service
 from backend.application.common import now, scoped
 from backend.application.identity import LocalTokenVerifier
 from backend.domain.rules import BusinessError
@@ -28,6 +30,7 @@ from backend.persistence import models as m
 from backend.persistence.foundations import FOUNDATION_MODELS as F
 from backend.shared import metrics
 from backend.shared.auth import OIDCVerifier, Principal, current_principal
+from backend.shared.client_ip import client_ip
 from backend.shared.contracts import ErrorBody, ErrorResponse, Health, PrincipalView
 from backend.shared.database import create_database, session_scope
 from backend.shared.logging import configure_logging
@@ -111,7 +114,97 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         start = perf_counter()
         try:
-            response = await call_next(request)
+            content_length = request.headers.get("content-length")
+            if content_length:
+                try:
+                    declared_length = int(content_length)
+                except ValueError:
+                    response = error(
+                        request, 400, "invalid_content_length", "Invalid content length"
+                    )
+                else:
+                    response = (
+                        error(
+                            request,
+                            413,
+                            "request_too_large",
+                            "Request body exceeds the configured limit",
+                        )
+                        if declared_length < 0 or declared_length > settings.max_request_body_bytes
+                        else None
+                    )
+            else:
+                response = None
+
+            if response is None:
+                body = bytearray()
+                async for chunk in request.stream():
+                    body.extend(chunk)
+                    if len(body) > settings.max_request_body_bytes:
+                        response = error(
+                            request,
+                            413,
+                            "request_too_large",
+                            "Request body exceeds the configured limit",
+                        )
+                        break
+                if response is None:
+                    request._body = bytes(body)
+
+            if response is None and (
+                request.url.path.startswith("/api/v1/")
+                or request.url.path in {"/health/ready", "/health/capabilities"}
+            ):
+                # A fixed shared PostgreSQL network bucket limits aggregate API
+                # traffic across replicas. Separate family budgets protect CPU- or
+                # I/O-heavy routes without trusting client-supplied identity headers.
+                peer = client_ip(request)
+                path = request.url.path
+                endpoint, limit = "api", settings.api_requests_per_minute
+                if path.startswith("/health/"):
+                    endpoint, limit = "health-checks", 120
+                elif path.startswith("/api/v1/ai/"):
+                    endpoint, limit = "api-ai", 60
+                elif path.startswith("/api/v1/bulk/") or path.endswith("customers-export"):
+                    endpoint, limit = "api-bulk-export", 20
+                elif path == "/api/v1/catalog/products":
+                    endpoint, limit = "api-search", 180
+                elif path.startswith("/api/v1/auth/"):
+                    endpoint, limit = "api-auth", settings.auth_rate_limit_per_minute * 2
+
+                # Unit-only apps with placeholder DB credentials cannot persist a
+                # distributed budget; production/staging reject that configuration.
+                if "REPLACE_ME" not in settings.database_url.get_secret_value():
+                    try:
+                        async with request.app.state.sessions.begin() as rate_db:
+                            allowed = await identity_service.rate_limit_network(
+                                rate_db,
+                                peer,
+                                endpoint=endpoint,
+                                limit=limit,
+                            )
+                    except Exception:
+                        logging.getLogger("quickbuddy").error(
+                            "request_throttle_unavailable",
+                            extra={"request_id": request.state.request_id},
+                        )
+                        response = error(
+                            request,
+                            503,
+                            "request_throttling_unavailable",
+                            "Request protection is temporarily unavailable",
+                        )
+                    else:
+                        if not allowed:
+                            response = error(
+                                request,
+                                429,
+                                "rate_limited",
+                                "Request rate limit exceeded; retry after 60 seconds",
+                                {"Retry-After": "60"},
+                            )
+            if response is None:
+                response = await call_next(request)
         except Exception:
             logging.getLogger("quickbuddy").error(
                 "unhandled_exception", extra={"request_id": request.state.request_id}
@@ -120,6 +213,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         route = request.scope.get("route")
         route_path = getattr(route, "path", "unmatched")
         metrics.http_requests.labels(request.method, route_path, str(response.status_code)).inc()
+        if response.status_code == 401:
+            metrics.security_events.labels("authentication_denied").inc()
+        elif response.status_code == 403:
+            metrics.security_events.labels("authorization_denied").inc()
+        elif response.status_code == 429:
+            metrics.security_events.labels("request_throttled").inc()
         metrics.http_request_duration.labels(request.method, route_path).observe(
             perf_counter() - start
         )
@@ -247,6 +346,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return PrincipalView(subject=principal.subject, roles=sorted(principal.roles))
 
     app.include_router(router)
+    app.include_router(customer_channel_router)
 
     @app.websocket("/api/v1/realtime")
     async def realtime(websocket: WebSocket, ticket: str, channel: str):

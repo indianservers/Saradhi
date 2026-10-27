@@ -277,6 +277,24 @@ class CatalogProductOut(IdOut):
     unit_price: Decimal
     available_quantity: Decimal
     serviceable: bool | None = None
+    average_rating: Decimal | None = None
+    review_count: int = 0
+
+
+class CustomerProductRatingIn(Input):
+    rating: int = Field(ge=1, le=5)
+
+
+class ReviewableOrderItemOut(IdOut):
+    product_name: str
+    variant_name: str
+    rating: int | None
+
+
+class CustomerReviewOut(IdOut):
+    order_item_id: UUID
+    rating: int
+    created_at: datetime
 
 
 class WindowIn(Input):
@@ -340,6 +358,8 @@ class CartItemIn(Input):
     address_id: UUID | None = None
     window_id: UUID
     delivery_method: Literal["pickup", "courier", "merchant_delivery"] = "pickup"
+    option_ids: list[UUID] = Field(default_factory=list, max_length=30)
+    preparation_notes: str = Field(default="", max_length=500)
 
 
 class CartItemOut(IdOut):
@@ -350,6 +370,7 @@ class CartItemOut(IdOut):
     address_id: UUID | None
     window_id: UUID
     delivery_method: str
+    preparation_notes: str = ""
     product_name: str | None = None
     variant_name: str | None = None
     branch_name: str | None = None
@@ -358,6 +379,7 @@ class CartItemOut(IdOut):
 
 
 class QuoteLineOut(BaseModel):
+    cart_item_id: UUID
     product_name: str
     variant_name: str
     branch_id: UUID
@@ -368,10 +390,29 @@ class QuoteLineOut(BaseModel):
     total: Decimal
     window_id: UUID
     delivery_method: str
+    addons: list[dict] = Field(default_factory=list)
+    preparation_notes: str = ""
     branch_name: str | None = None
     window_starts_at: datetime | None = None
     window_ends_at: datetime | None = None
     delivery_address: str | None = None
+
+
+class QuoteShipmentOut(BaseModel):
+    branch_id: UUID
+    branch_name: str
+    window_id: UUID
+    delivery_method: str
+    line_ids: list[str]
+    items: Decimal
+    extras: Decimal
+    delivery_fee: Decimal
+    taxes: Decimal
+    discounts: Decimal
+    total: Decimal
+    estimated_arrival_start: datetime
+    estimated_arrival_end: datetime
+    estimate_basis: str
 
 
 class QuoteOut(IdOut):
@@ -380,6 +421,8 @@ class QuoteOut(IdOut):
     total: Decimal
     expires_at: datetime
     lines: list[QuoteLineOut] = Field(default_factory=list)
+    breakdown: dict[str, Decimal | None] = Field(default_factory=dict)
+    shipments: list[QuoteShipmentOut] = Field(default_factory=list)
 
 
 class ConfirmIn(Input):
@@ -791,6 +834,19 @@ class MessageOut(IdOut):
     ticket_id: UUID
     author_id: UUID
     body: str
+
+
+class CustomerTicketOut(IdOut):
+    subject: str
+    status: str
+    order_id: UUID | None
+    created_at: datetime
+
+
+class CustomerTicketMessageOut(IdOut):
+    author: Literal["you", "support"]
+    body: str
+    created_at: datetime
 
 
 class MemberIn(Input):

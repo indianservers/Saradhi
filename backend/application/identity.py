@@ -81,21 +81,29 @@ class LocalTokenVerifier:
         return Principal(str(uid), frozenset(roles))
 
 
-async def rate_limit(session, identity, network, *, limit=10):
-    """Durable shared PostgreSQL buckets; callers COMMIT failures too, before raising."""
+async def _increment_rate_bucket(session, raw_key):
     instant = now().replace(second=0, microsecond=0)
-    for raw in ("identity:" + identity, "network:" + network):
-        query = insert(m.RateBucket).values(
-            bucket_key=digest(raw), window_start=instant, attempts=1
-        )
-        query = query.on_conflict_do_update(
-            index_elements=["bucket_key", "window_start"],
-            set_={"attempts": m.RateBucket.attempts + 1},
-        ).returning(m.RateBucket.attempts)
-        attempts = await session.scalar(query)
-        if attempts > limit:
+    query = insert(m.RateBucket).values(
+        bucket_key=digest(raw_key), window_start=instant, attempts=1
+    )
+    query = query.on_conflict_do_update(
+        index_elements=["bucket_key", "window_start"],
+        set_={"attempts": m.RateBucket.attempts + 1},
+    ).returning(m.RateBucket.attempts)
+    return await session.scalar(query)
+
+
+async def rate_limit(session, identity, network, *, limit=10, endpoint="auth"):
+    """Durable shared PostgreSQL identity and network buckets, partitioned by endpoint."""
+    for raw in (f"identity:{endpoint}:{identity}", f"network:{endpoint}:{network}"):
+        if await _increment_rate_bucket(session, raw) > limit:
             return False
     return True
+
+
+async def rate_limit_network(session, network, *, endpoint, limit):
+    """One shared per-network bucket for global and expensive endpoint budgets."""
+    return await _increment_rate_bucket(session, f"network:{endpoint}:{network}") <= limit
 
 
 async def register(session, email, password):

@@ -386,6 +386,16 @@ class CartItem(Record, Base):
     address_id: Mapped[UUID | None] = fk("geo.addresses.id")
     window_id: Mapped[UUID] = fk("fulfillment.delivery_windows.id")
     delivery_method: Mapped[str] = mapped_column(Text, default="pickup")
+    preparation_notes: Mapped[str] = mapped_column(Text, default="", server_default="")
+
+
+class ProductCustomerDetails(Record, Base):
+    __tablename__ = "product_customer_details"
+    __table_args__ = (UniqueConstraint("product_id"), {"schema": "catalog"})
+    product_id: Mapped[UUID] = fk("catalog.products.id")
+    ingredients: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    allergens_reviewed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class Window(Record, Base):

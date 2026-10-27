@@ -1,0 +1,127 @@
+{
+  "demo": true,
+  "restaurants": [
+    {
+      "id": "demo_deccan",
+      "name": "Demo Deccan Kitchen",
+      "city": "Sample city",
+      "rating": 4.6,
+      "rating_count": 120,
+      "rating_source": "Synthetic test rating",
+      "menu": [
+        {
+          "id": "chicken",
+          "name": "Chicken biryani",
+          "price_minor": 24900
+        },
+        {
+          "id": "mutton",
+          "name": "Mutton biryani",
+          "price_minor": 34900
+        },
+        {
+          "id": "veg",
+          "name": "Veg biryani",
+          "price_minor": 18900,
+          "vegetarian": true
+        },
+        {
+          "id": "paneer",
+          "name": "Paneer butter masala",
+          "price_minor": 22900,
+          "vegetarian": true
+        },
+        {
+          "id": "roti",
+          "name": "Butter roti",
+          "price_minor": 3500,
+          "vegetarian": true
+        }
+      ],
+      "demo_delivery_fee_minor": 2500,
+      "demo_eta_minutes": [
+        25,
+        40
+      ]
+    },
+    {
+      "id": "demo_spice",
+      "name": "Demo Spice Table",
+      "city": "Sample city",
+      "rating": 4.3,
+      "rating_count": 85,
+      "rating_source": "Synthetic test rating",
+      "menu": [
+        {
+          "id": "chicken",
+          "name": "Chicken biryani",
+          "price_minor": 21900
+        },
+        {
+          "id": "egg",
+          "name": "Egg biryani",
+          "price_minor": 17900
+        },
+        {
+          "id": "veg",
+          "name": "Veg biryani",
+          "price_minor": 16900,
+          "vegetarian": true
+        },
+        {
+          "id": "dosa",
+          "name": "Masala dosa",
+          "price_minor": 9900,
+          "vegetarian": true
+        },
+        {
+          "id": "tikka",
+          "name": "Chicken tikka",
+          "price_minor": 25900
+        }
+      ],
+      "demo_delivery_fee_minor": 3500,
+      "demo_eta_minutes": [
+        35,
+        50
+      ]
+    },
+    {
+      "id": "demo_market",
+      "name": "Demo Fresh Basket",
+      "city": "Sample city",
+      "kind": "groceries",
+      "menu": [
+        {
+          "id": "rice",
+          "name": "Rice 1 kg",
+          "price_minor": 6500,
+          "kind": "groceries",
+          "unit": "1 kg",
+          "vegetarian": true
+        },
+        {
+          "id": "tomato",
+          "name": "Tomatoes 1 kg",
+          "price_minor": 4000,
+          "kind": "groceries",
+          "unit": "1 kg",
+          "vegetarian": true
+        },
+        {
+          "id": "milk",
+          "name": "Milk 1 litre",
+          "price_minor": 6000,
+          "kind": "groceries",
+          "unit": "1 litre",
+          "vegetarian": true
+        }
+      ],
+      "demo_delivery_fee_minor": 4500,
+      "demo_eta_minutes": [
+        45,
+        60
+      ]
+    }
+  ]
+}

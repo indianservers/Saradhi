@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import io
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from time import perf_counter
 from typing import Annotated
@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import aliased
 
@@ -43,10 +43,14 @@ from backend.modules.tracking.realtime import publish
 from backend.persistence import models as m
 from backend.persistence.foundations import FOUNDATION_MODELS as F
 from backend.persistence.repositories import Repository
+from backend.shared.client_ip import client_ip
 
 router = APIRouter(prefix="/api/v1")
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)]
 Limit = Annotated[int, Query(ge=1, le=100)]
+CatalogBranchName = Annotated[str | None, Query(max_length=100)]
+CatalogMaxPrice = Annotated[Decimal | None, Query(gt=0, max_digits=12, decimal_places=4)]
+CatalogDietary = Annotated[list[str] | None, Query(max_length=6)]
 
 
 def decode_cursor(raw):
@@ -81,14 +85,15 @@ def local_auth(request):
     return verifier
 
 
-async def auth_budget(request, identity_key):
+async def auth_budget(request, identity_key, endpoint="auth"):
     # Separate committed transaction preserves failed login/OTP rate counters.
     async with request.app.state.sessions.begin() as db:
         allowed = await identity.rate_limit(
             db,
             identity_key,
-            request.client.host if request.client else "unknown",
+            client_ip(request),
             limit=request.app.state.settings.auth_rate_limit_per_minute,
+            endpoint=endpoint,
         )
     if not allowed:
         raise BusinessError(
@@ -96,10 +101,26 @@ async def auth_budget(request, identity_key):
         )
 
 
+async def actor_budget(request, actor, endpoint, limit):
+    """Committed shared endpoint + user/IP throttle for costly or sensitive actions."""
+    async with request.app.state.sessions.begin() as rate_db:
+        allowed = await identity.rate_limit(
+            rate_db,
+            actor.subject,
+            client_ip(request),
+            limit=limit,
+            endpoint=endpoint,
+        )
+    if not allowed:
+        raise BusinessError(
+            "rate_limited", "Action rate limit exceeded; retry after 60 seconds", 429
+        )
+
+
 @router.post("/auth/register", response_model=s.IdOut, status_code=201, tags=["Identity"])
 async def register(body: s.RegisterIn, request: Request):
     local_auth(request)
-    await auth_budget(request, body.email.lower())
+    await auth_budget(request, body.email.lower(), "register")
     async with request.app.state.sessions.begin() as db:
         return await identity.register(db, body.email, body.password.get_secret_value())
 
@@ -107,7 +128,7 @@ async def register(body: s.RegisterIn, request: Request):
 @router.post("/auth/login", response_model=s.TokenOut, tags=["Identity"])
 async def login(body: s.LoginIn, request: Request):
     verifier = local_auth(request)
-    await auth_budget(request, body.email.lower())
+    await auth_budget(request, body.email.lower(), "login")
     async with request.app.state.sessions.begin() as db:
         result = await identity.login(db, verifier, body.email, body.password.get_secret_value())
     if result is None:
@@ -118,7 +139,11 @@ async def login(body: s.LoginIn, request: Request):
 @router.post("/auth/refresh", response_model=s.TokenOut, tags=["Identity"])
 async def refresh(body: s.RefreshIn, request: Request):
     verifier = local_auth(request)
-    await auth_budget(request, "refresh:" + identity.digest(body.refresh_token.get_secret_value()))
+    await auth_budget(
+        request,
+        "refresh:" + identity.digest(body.refresh_token.get_secret_value()),
+        "refresh",
+    )
     async with request.app.state.sessions.begin() as db:
         result = await identity.refresh(db, verifier, body.refresh_token.get_secret_value())
     if result is None:
@@ -234,6 +259,7 @@ async def record_customer_consent(body: s.CustomerConsentIn, key: Key, actor: Ac
 @router.post("/auth/challenges", response_model=s.IdOut, status_code=201, tags=["Identity"])
 async def challenge(body: s.OtpIn, actor: Actor, request: Request, db: DB):
     email = await db.scalar(select(m.Email.address).where(m.Email.user_id == UUID(actor.subject)))
+    await auth_budget(request, "otp-create:" + actor.subject, "otp-create")
     return await identity.create_challenge(
         db,
         UUID(actor.subject),
@@ -248,7 +274,7 @@ async def challenge(body: s.OtpIn, actor: Actor, request: Request, db: DB):
 async def consume_challenge(
     challenge_id: UUID, body: s.OtpConsumeIn, actor: Actor, request: Request
 ):
-    await auth_budget(request, "otp:" + actor.subject)
+    await auth_budget(request, "otp:" + actor.subject, "otp-consume")
     async with request.app.state.sessions.begin() as db:
         valid = await identity.consume_challenge(
             db,
@@ -367,11 +393,13 @@ async def merchant_onboarding(body: s.MerchantOnboardingIn, actor: Actor, db: DB
     status_code=201,
     tags=["Identity"],
 )
-async def member(organization_id: UUID, body: s.MemberIn, actor: Actor, db: DB):
+async def member(organization_id: UUID, body: s.MemberIn, actor: Actor, request: Request, db: DB):
     branch = await branch_scope(db, actor, body.branch_id, "organization.members")
     if branch.organization_id != organization_id:
         raise BusinessError("forbidden", "Branch is outside this organization", 403)
-    await Repository(db).require(m.User, body.user_id)
+    target_user = await Repository(db).require(m.User, body.user_id)
+    if target_user.status != "active":
+        raise BusinessError("member_inactive", "Only active users can be assigned", 422)
     membership = await db.scalar(
         select(m.Membership).where(
             m.Membership.organization_id == organization_id, m.Membership.user_id == body.user_id
@@ -382,6 +410,8 @@ async def member(organization_id: UUID, body: s.MemberIn, actor: Actor, db: DB):
             db, m.Membership, organization_id=organization_id, user_id=body.user_id, status="active"
         )
     role = await db.scalar(select(m.Role).where(m.Role.name == body.role))
+    if role is None:
+        raise BusinessError("role_unavailable", "Requested member role is unavailable", 422)
     await add(
         db,
         m.RoleAssignment,
@@ -390,6 +420,16 @@ async def member(organization_id: UUID, body: s.MemberIn, actor: Actor, db: DB):
         role_id=role.id,
         branch_id=branch.id,
         city_id=branch.city_id,
+    )
+    await audit(
+        db,
+        actor,
+        "organization.member_role_assigned",
+        body.user_id,
+        request.state.request_id,
+        organization_id=organization_id,
+        current=body.role,
+        decision="assigned",
     )
     return membership
 
@@ -861,14 +901,52 @@ async def customer_catalog(
     branch_id: UUID | None = None,
     category_id: UUID | None = None,
     merchant_type: str | None = None,
+    branch_name: CatalogBranchName = None,
+    max_price: CatalogMaxPrice = None,
+    dietary: CatalogDietary = None,
     q: str | None = Query(default=None, max_length=100),
     cursor: str | None = None,
     limit: Limit = 30,
 ):
     """Browse currently priced, in-stock products at approved customer-facing branches."""
     instant = now()
+    reviews = F["engagement.reviews"]
+    average_rating = (
+        select(func.avg(reviews.rating))
+        .select_from(reviews)
+        .join(m.OrderItem, reviews.order_item_id == m.OrderItem.id)
+        .join(m.Variant, m.OrderItem.variant_id == m.Variant.id)
+        .where(
+            m.Variant.product_id == m.Product.id,
+            reviews.moderation_status == "published",
+        )
+        .correlate(m.Product)
+        .scalar_subquery()
+    )
+    review_count = (
+        select(func.count(reviews.id))
+        .select_from(reviews)
+        .join(m.OrderItem, reviews.order_item_id == m.OrderItem.id)
+        .join(m.Variant, m.OrderItem.variant_id == m.Variant.id)
+        .where(
+            m.Variant.product_id == m.Product.id,
+            reviews.moderation_status == "published",
+        )
+        .correlate(m.Product)
+        .scalar_subquery()
+    )
     statement = (
-        select(m.Price, m.Variant, m.Product, m.Branch, m.Brand, m.Category, m.Stock)
+        select(
+            m.Price,
+            m.Variant,
+            m.Product,
+            m.Branch,
+            m.Brand,
+            m.Category,
+            m.Stock,
+            average_rating,
+            review_count,
+        )
         .join(m.Variant, m.Variant.id == m.Price.variant_id)
         .join(m.Product, m.Product.id == m.Variant.product_id)
         .join(m.Branch, m.Branch.id == m.Price.branch_id)
@@ -895,17 +973,54 @@ async def customer_catalog(
         statement = statement.where(m.Product.category_id == category_id)
     if merchant_type:
         statement = statement.where(m.Brand.merchant_type == merchant_type)
+    if branch_name and branch_name.strip():
+        statement = statement.where(m.Branch.name.ilike(f"%{branch_name.strip()}%"))
+    if max_price is not None:
+        statement = statement.where(m.Price.amount <= max_price)
+    if dietary:
+        invalid_code = any(
+            not code or len(code) > 32 or not code.replace("_", "").isalnum() for code in dietary
+        )
+        if invalid_code:
+            raise BusinessError(
+                "invalid_dietary_filter", "Dietary filters must be short codes", 422
+            )
+        dietary_attributes = F["catalog.dietary_attributes"]
+        for code in set(code.lower() for code in dietary):
+            statement = statement.where(
+                select(dietary_attributes.id)
+                .where(
+                    dietary_attributes.product_id == m.Product.id,
+                    dietary_attributes.dietary_code == code,
+                )
+                .exists()
+            )
     if q and q.strip():
         pattern = f"%{q.strip()}%"
         statement = statement.where(
-            or_(m.Product.name.ilike(pattern), m.Variant.name.ilike(pattern))
+            or_(
+                m.Product.name.ilike(pattern),
+                m.Variant.name.ilike(pattern),
+                m.Branch.name.ilike(pattern),
+                m.Brand.name.ilike(pattern),
+            )
         )
     if cursor:
         statement = statement.where(m.Price.id > decode_cursor(cursor))
     rows = (await db.execute(statement.order_by(m.Price.id).limit(limit + 1))).all()
     has_more = len(rows) > limit
     items = []
-    for price, variant, product, branch, brand, category_row, stock in rows[:limit]:
+    for (
+        price,
+        variant,
+        product,
+        branch,
+        brand,
+        category_row,
+        stock,
+        rating_average,
+        rating_count,
+    ) in rows[:limit]:
         items.append(
             s.CatalogProductOut(
                 id=price.id,
@@ -923,6 +1038,8 @@ async def customer_catalog(
                 currency=price.currency,
                 unit_price=price.amount,
                 available_quantity=stock.on_hand - stock.reserved,
+                average_rating=rating_average,
+                review_count=rating_count,
             )
         )
     next_cursor = None
@@ -986,9 +1103,22 @@ async def price(branch_id: UUID, body: s.PriceIn, actor: Actor, db: DB):
 )
 async def prices(branch_id: UUID, db: DB, cursor: str | None = None, limit: Limit = 50):
     branch = await Repository(db).require(m.Branch, branch_id)
-    if branch.status != "approved":
+    city = await db.get(m.City, branch.city_id)
+    if branch.status != "approved" or not branch.accepting_orders or not city or not city.active:
         raise BusinessError("not_found", "Resource not found", 404)
-    return await page(db, m.Price, [m.Price.branch_id == branch_id], s.PriceOut, cursor, limit)
+    instant = now()
+    return await page(
+        db,
+        m.Price,
+        [
+            m.Price.branch_id == branch_id,
+            m.Price.starts_at <= instant,
+            or_(m.Price.ends_at.is_(None), m.Price.ends_at > instant),
+        ],
+        s.PriceOut,
+        cursor,
+        limit,
+    )
 
 
 @router.post(
@@ -1010,6 +1140,12 @@ async def window(branch_id: UUID, body: s.WindowIn, actor: Actor, db: DB):
     tags=["Fulfillment"],
 )
 async def windows(branch_id: UUID, db: DB, cursor: str | None = None, limit: Limit = 50):
+    branch = await db.get(m.Branch, branch_id)
+    if not branch or branch.status != "approved" or not branch.accepting_orders:
+        raise BusinessError("not_found", "Resource not found", 404)
+    city = await db.get(m.City, branch.city_id)
+    if not city or not city.active:
+        raise BusinessError("not_found", "Resource not found", 404)
     return await page(
         db,
         m.Window,
@@ -1293,7 +1429,9 @@ async def remove_item(cart_id: UUID, item_id: UUID, actor: Actor, db: DB):
 async def quote(cart_id: UUID, actor: Actor, db: DB):
     quote_row = await commerce.make_quote(db, actor, cart_id)
     payload = s.QuoteOut.model_validate(quote_row).model_dump()
-    lines = quote_row.snapshot.get("lines", [])
+    import copy
+
+    lines = copy.deepcopy(quote_row.snapshot.get("lines", []))
     branch_ids = {UUID(line["branch_id"]) for line in lines}
     window_ids = {UUID(line["window_id"]) for line in lines}
     branches_by_id = (
@@ -1321,6 +1459,23 @@ async def quote(cart_id: UUID, actor: Actor, db: DB):
         address = line.get("address") or {}
         line["delivery_address"] = address.get("address_text")
     payload["lines"] = lines
+    from decimal import Decimal
+
+    item_subtotal = sum(
+        (Decimal(line["unit_price"]) * Decimal(line["quantity"]) for line in lines), Decimal(0)
+    )
+    payload["breakdown"] = {
+        "items": item_subtotal,
+        "extras": sum((Decimal(line["total"]) for line in lines), Decimal(0)) - item_subtotal,
+        "delivery": sum(
+            (Decimal(group["delivery_fee"]) for group in quote_row.snapshot.get("shipments", [])),
+            Decimal(0),
+        ),
+        "taxes": Decimal(0),
+        "discounts": Decimal(0),
+        "total": quote_row.total,
+    }
+    payload["shipments"] = quote_row.snapshot.get("shipments", [])
     return payload
 
 
@@ -1343,6 +1498,122 @@ async def order(order_id: UUID, actor: Actor, db: DB):
     row = await Repository(db).require(m.Order, order_id)
     owned(actor, row.user_id)
     return row
+
+
+@router.get(
+    "/orders/{order_id}/reviewable-items",
+    response_model=s.Page[s.ReviewableOrderItemOut],
+    tags=["Customer feedback"],
+)
+async def reviewable_order_items(
+    order_id: UUID,
+    actor: Actor,
+    db: DB,
+    cursor: str | None = None,
+    limit: Limit = 50,
+):
+    order_row = await Repository(db).require(m.Order, order_id)
+    owned(actor, order_row.user_id)
+    reviews = F["engagement.reviews"]
+    statement = (
+        select(m.OrderItem, reviews.rating)
+        .join(
+            m.FulfillmentUnit,
+            m.FulfillmentUnit.id == m.OrderItem.fulfillment_unit_id,
+        )
+        .join(m.MerchantOrder, m.MerchantOrder.id == m.OrderItem.merchant_order_id)
+        .outerjoin(
+            reviews,
+            and_(
+                reviews.order_item_id == m.OrderItem.id,
+                reviews.user_id == UUID(actor.subject),
+            ),
+        )
+        .where(
+            m.MerchantOrder.order_id == order_row.id,
+            m.FulfillmentUnit.status == "delivered",
+        )
+    )
+    if cursor:
+        statement = statement.where(m.OrderItem.id > decode_cursor(cursor))
+    rows = (await db.execute(statement.order_by(m.OrderItem.id).limit(limit + 1))).all()
+    has_more = len(rows) > limit
+    items = [
+        {
+            "id": item.id,
+            "product_name": item.product_name,
+            "variant_name": item.variant_name,
+            "rating": rating,
+        }
+        for item, rating in rows[:limit]
+    ]
+    next_cursor = (
+        base64.urlsafe_b64encode(items[-1]["id"].bytes).decode().rstrip("=")
+        if has_more and items
+        else None
+    )
+    return {"items": items, "next_cursor": next_cursor}
+
+
+@router.post(
+    "/order-items/{order_item_id}/review",
+    response_model=s.CustomerReviewOut,
+    status_code=201,
+    tags=["Customer feedback"],
+)
+async def submit_order_item_review(
+    order_item_id: UUID,
+    body: s.CustomerProductRatingIn,
+    actor: Actor,
+    request: Request,
+    db: DB,
+):
+    await actor_budget(request, actor, "customer-product-review", 20)
+    row = await db.execute(
+        select(m.OrderItem, m.FulfillmentUnit, m.MerchantOrder, m.Order)
+        .join(m.FulfillmentUnit, m.FulfillmentUnit.id == m.OrderItem.fulfillment_unit_id)
+        .join(m.MerchantOrder, m.MerchantOrder.id == m.OrderItem.merchant_order_id)
+        .join(m.Order, m.Order.id == m.MerchantOrder.order_id)
+        .where(m.OrderItem.id == order_item_id)
+        .with_for_update(of=m.OrderItem)
+    )
+    item, unit, child, order_row = row.first() or (None, None, None, None)
+    if item is None:
+        raise BusinessError("not_found", "Order item not found", 404)
+    owned(actor, order_row.user_id)
+    if unit.status != "delivered":
+        raise BusinessError("review_requires_delivery", "Only delivered items can be rated", 409)
+    reviews = F["engagement.reviews"]
+    existing = await db.scalar(
+        select(reviews).where(
+            reviews.user_id == UUID(actor.subject),
+            reviews.order_item_id == item.id,
+        )
+    )
+    if existing:
+        if existing.rating == body.rating:
+            return existing
+        raise BusinessError("review_already_submitted", "This item has already been rated", 409)
+    branch = await Repository(db).require(m.Branch, child.branch_id)
+    review = await add(
+        db,
+        reviews,
+        user_id=UUID(actor.subject),
+        order_item_id=item.id,
+        rating=body.rating,
+        body="",
+        moderation_status="published",
+    )
+    await audit(
+        db,
+        actor,
+        "customer.product_rating.create",
+        review.id,
+        request.state.request_id,
+        branch.organization_id,
+        current=body.rating,
+    )
+    return review
 
 
 @router.get("/orders/{order_id}/payment", response_model=s.PaymentOut, tags=["Finance"])
@@ -1477,7 +1748,7 @@ async def merchant_order_queue(
 async def create_kitchen_station(
     branch_id: UUID, body: s.KitchenStationIn, actor: Actor, request: Request, db: DB
 ):
-    branch = await branch_scope(db, actor, branch_id, "merchant.write", True)
+    branch = await branch_scope(db, actor, branch_id, "kitchen.manage", True)
     if await db.scalar(
         select(m.KitchenStation.id).where(
             m.KitchenStation.branch_id == branch.id,
@@ -1507,7 +1778,7 @@ async def create_kitchen_station(
     tags=["Merchant workspace"],
 )
 async def kitchen_stations(branch_id: UUID, actor: Actor, db: DB):
-    await branch_scope(db, actor, branch_id, "merchant.write")
+    await branch_scope(db, actor, branch_id, "kitchen.manage")
     return (
         await db.scalars(
             select(m.KitchenStation)
@@ -1531,7 +1802,7 @@ async def kitchen_tasks(
     cursor: str | None = None,
     limit: Limit = 100,
 ):
-    await branch_scope(db, actor, branch_id, "merchant.write")
+    await branch_scope(db, actor, branch_id, "kitchen.manage")
     predicates = [m.KitchenTask.branch_id == branch_id]
     if station_id:
         predicates.append(m.KitchenTask.station_id == station_id)
@@ -1594,7 +1865,7 @@ async def reassign_kitchen_task(
     task_id: UUID, body: s.KitchenTaskStationIn, actor: Actor, request: Request, db: DB
 ):
     task = await Repository(db).require(m.KitchenTask, task_id, lock=True)
-    branch = await branch_scope(db, actor, task.branch_id, "merchant.write", True)
+    branch = await branch_scope(db, actor, task.branch_id, "kitchen.manage", True)
     if task.version != body.expected_version:
         raise BusinessError("version_conflict", "Expected version does not match")
     if task.status != "pending":
@@ -1628,7 +1899,7 @@ async def transition_kitchen_task(
     task_id: UUID, body: s.KitchenTaskTransitionIn, actor: Actor, request: Request, db: DB
 ):
     task = await Repository(db).require(m.KitchenTask, task_id, lock=True)
-    branch = await branch_scope(db, actor, task.branch_id, "merchant.write")
+    branch = await branch_scope(db, actor, task.branch_id, "kitchen.manage")
     if task.status == body.target:
         return await _kitchen_task_out(db, task)
     if task.version != body.expected_version:
@@ -2893,7 +3164,8 @@ async def ai_positioning(zone_id: UUID, actor: Actor, db: DB):
 
 @router.post("/ai/dispatch/recommend", tags=["AI intelligence"])
 @router.post("/ai/dispatch/optimize", tags=["AI intelligence"])
-async def ai_dispatch_optimize(body: s.DispatchOptimizeIn, actor: Actor, db: DB):
+async def ai_dispatch_optimize(body: s.DispatchOptimizeIn, actor: Actor, request: Request, db: DB):
+    await actor_budget(request, actor, "ai-dispatch", 30)
     if len(set(body.task_ids)) != len(body.task_ids):
         raise BusinessError("duplicate_task", "Task list must contain unique IDs", 422)
     await scoped(db, actor, "ai.read", city_id=body.city_id)
@@ -3452,6 +3724,7 @@ async def ai_copilot_status(actor: Actor, request: Request):
 async def ai_agent_query(
     agent: str, body: s.AiAgentQueryIn, actor: Actor, request: Request, db: DB
 ):
+    await actor_budget(request, actor, "ai-agent-query", 20)
     spec = AI_AGENTS.get(agent)
     if spec is None:
         raise BusinessError("agent_not_found", "AI assistant is not available", 404)
@@ -4086,6 +4359,83 @@ async def ticket(body: s.TicketIn, actor: Actor, db: DB):
     return await add(db, m.Ticket, user_id=UUID(actor.subject), **body.model_dump())
 
 
+@router.get(
+    "/me/support/tickets",
+    response_model=s.Page[s.CustomerTicketOut],
+    tags=["Customer support"],
+)
+async def my_support_tickets(actor: Actor, db: DB, cursor: str | None = None, limit: Limit = 50):
+    """Return only the authenticated customer's own support cases."""
+    return await page(
+        db,
+        m.Ticket,
+        [m.Ticket.user_id == UUID(actor.subject)],
+        s.CustomerTicketOut,
+        cursor,
+        limit,
+    )
+
+
+@router.get(
+    "/me/support/tickets/{ticket_id}/messages",
+    response_model=s.Page[s.CustomerTicketMessageOut],
+    tags=["Customer support"],
+)
+async def my_support_ticket_messages(
+    ticket_id: UUID,
+    actor: Actor,
+    db: DB,
+    cursor: str | None = None,
+    limit: Limit = 50,
+):
+    """Read a customer's own conversation without exposing support-agent identities."""
+    ticket = await db.scalar(
+        select(m.Ticket).where(m.Ticket.id == ticket_id, m.Ticket.user_id == UUID(actor.subject))
+    )
+    if ticket is None:
+        raise BusinessError("not_found", "Support ticket not found", 404)
+    after = None
+    if cursor:
+        try:
+            raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
+            timestamp, identifier = raw.rsplit("|", 1)
+            after = (datetime.fromisoformat(timestamp), UUID(identifier))
+            if after[0].tzinfo is None:
+                raise ValueError("timestamp must include timezone")
+        except (ValueError, TypeError, UnicodeDecodeError) as exc:
+            raise BusinessError("invalid_cursor", "Invalid page cursor", 422) from exc
+    statement = select(m.TicketMessage).where(m.TicketMessage.ticket_id == ticket.id)
+    if after:
+        statement = statement.where(
+            tuple_(m.TicketMessage.created_at, m.TicketMessage.id) > tuple_(*after)
+        )
+    all_rows = list(
+        (
+            await db.scalars(
+                statement.order_by(m.TicketMessage.created_at, m.TicketMessage.id).limit(limit + 1)
+            )
+        ).all()
+    )
+    rows = all_rows[:limit]
+    next_cursor = None
+    if len(all_rows) > limit and rows:
+        last = rows[-1]
+        payload = f"{last.created_at.isoformat()}|{last.id}"
+        next_cursor = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "author": "you" if row.author_id == UUID(actor.subject) else "support",
+                "body": row.body,
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ],
+        "next_cursor": next_cursor,
+    }
+
+
 @router.post(
     "/support/tickets/{ticket_id}/messages",
     response_model=s.MessageOut,
@@ -4538,6 +4888,7 @@ async def create_bulk_import(
     idempotency_key: Key,
     entity: Annotated[str, Header(alias="X-Bulk-Entity")],
 ):
+    await actor_budget(request, actor, "bulk-import", 10)
     if entity != "branches":
         raise BusinessError("bulk_entity_not_supported", "Only branch onboarding is enabled", 422)
     content_length = request.headers.get("content-length")
@@ -4855,6 +5206,7 @@ async def cancel_bulk_job(job_id: UUID, request: Request, actor: Actor, db: DB):
 
 @router.post("/bulk/exports", tags=["Bulk data"])
 async def export_branches(body: s.BulkExportIn, request: Request, actor: Actor, db: DB):
+    await actor_budget(request, actor, "bulk-export", 10)
     rows = (
         await db.execute(
             select(m.Branch, m.Brand.merchant_type)
@@ -5472,6 +5824,7 @@ async def admin_customer_export(
     ),
     limit: int = Query(default=500, ge=1, le=500),
 ):
+    await actor_budget(request, actor, "customer-export", 10)
     global_access, organization_ids, city_ids = await customer_admin.customer_scope(db, actor)
     if not global_access and city_id not in city_ids and not organization_ids:
         raise BusinessError("forbidden", "City is outside customer administration scope", 403)
@@ -5546,6 +5899,7 @@ async def preview_customer_segment(
     actor: Actor,
     db: DB,
 ):
+    await actor_budget(request, actor, "customer-segment-preview", 20)
     global_access, organization_ids, city_ids = await customer_admin.customer_scope(db, actor)
     if not global_access and body.city_id not in city_ids and not organization_ids:
         raise BusinessError("forbidden", "City is outside customer administration scope", 403)
