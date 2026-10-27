@@ -77,14 +77,52 @@ async def main():
     # Fast no-op on rerun; never duplicate or rewrite any seeded business rows.
     engine = create_database(settings)
     async with engine.connect() as connection:
-        exists = await connection.scalar(
+        marker_id = await connection.scalar(
             select(m.Organization.id).where(m.Organization.name == MARKER).limit(1)
         )
+        if marker_id:
+            checks = {
+                "demo users": await connection.scalar(
+                    select(m.Email.id).where(m.Email.address == "demo.support@example.test").limit(1)
+                ),
+                "both merchants": await connection.scalar(
+                    select(m.Organization.id)
+                    .where(m.Organization.name == "Sunrise Market")
+                    .limit(1)
+                ),
+                "demo order": await connection.scalar(
+                    select(m.Order.id)
+                    .join(m.Email, m.Email.user_id == m.Order.user_id)
+                    .where(m.Email.address == "demo.customer@example.test")
+                    .limit(1)
+                ),
+                "demo pilot": await connection.scalar(
+                    select(m.Pilot.id)
+                    .join(m.User, m.User.id == m.Pilot.user_id)
+                    .join(m.Email, m.Email.user_id == m.User.id)
+                    .where(m.Email.address == "demo.pilot@example.test")
+                    .limit(1)
+                ),
+                "demo support case": await connection.scalar(
+                    select(m.Ticket.id)
+                    .join(m.Email, m.Email.user_id == m.Ticket.user_id)
+                    .where(m.Email.address == "demo.customer@example.test")
+                    .limit(1)
+                ),
+            }
+        else:
+            checks = {}
     await engine.dispose()
-    if exists:
+    if marker_id and all(checks.values()):
         print("Quickbuddy demo data is already present in quickbuddy_dev; no rows changed.")
         print(f"Demo account credentials: {SECRET_FILE}")
         return
+    if marker_id:
+        missing = ", ".join(name for name, value in checks.items() if not value)
+        raise SystemExit(
+            "A partial Quickbuddy demo seed was found. No rows changed. "
+            f"Inspect quickbuddy_dev before continuing; missing: {missing}."
+        )
 
     app = create_app(settings)
     counts = {"users": 0, "restaurants_or_stores": 0}
