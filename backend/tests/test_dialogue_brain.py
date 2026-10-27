@@ -99,7 +99,7 @@ def test_neural_plan_drives_contextual_discovery_without_submitting(tmp_path):
             "confidence": 0.99,
         }
     }
-    assert "Which dish" in store.process(message(2, "that one"))["text"]
+    assert "Which item" in store.process(message(2, "that one"))["text"]
 
 
 def test_unevaluated_or_changed_weights_do_not_replace_running_brain(tmp_path, monkeypatch):

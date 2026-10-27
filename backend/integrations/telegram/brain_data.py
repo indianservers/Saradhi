@@ -418,6 +418,14 @@ def build():
         row["new_v5"] = row["text"].lower() not in previous_v5
     assert len({r["text"].lower() for r in rows if r["new_v5"] and r["split"] == "train"}) >= 100
 
+    previous_v6 = {r["text"].lower() for r in rows}
+    from backend.integrations.telegram.commerce_nlp_data import add_examples
+
+    add_examples(add, target)
+    for row in rows:
+        row["new_v6"] = row["text"].lower() not in previous_v6
+    assert len({r["text"].lower() for r in rows if r["new_v6"] and r["split"] == "train"}) >= 500
+
     labels = {}
     for row in rows:
         assert row["input"] not in labels or labels[row["input"]] == row["target"], (

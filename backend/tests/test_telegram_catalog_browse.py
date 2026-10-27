@@ -18,7 +18,7 @@ def test_browse_food_groceries_and_all_with_card_details(tmp_path):
             state = json.loads(
                 store.db.execute("SELECT data FROM sessions WHERE chat=42").fetchone()[0]
             )
-            assert {c["kind"] for c in state["result_cards"]} == {"food", "groceries"}
+            assert {c["kind"] for c in state["result_cards"]} == {"food", "groceries", "essentials"}
             assert result["next_page"] == "Page 6"
 
 

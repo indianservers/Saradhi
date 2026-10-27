@@ -78,6 +78,7 @@ class Shopping:
                 (
                     "Food",
                     "Groceries",
+                    "Essentials",
                     "All items",
                     "Restaurants",
                     "Stores",
@@ -112,7 +113,15 @@ class Shopping:
                     if rows
                     else f"No {text.lower()} are currently available."
                 ),
-                buttons=("Food", "Groceries", "All items", "Cart", "Restaurants", "Stores"),
+                buttons=(
+                    "Food",
+                    "Groceries",
+                    "Essentials",
+                    "All items",
+                    "Cart",
+                    "Restaurants",
+                    "Stores",
+                ),
                 cards=[item_card(r, d) for r, d in rows],
             )
         if text == "Stores":
@@ -557,7 +566,12 @@ class Shopping:
             # Model-selected tool arguments replace keyword queries, not commerce validation.
             if plan.action == "clarify":
                 messages = {
-                    "ask_dish": "Which dish or restaurant do you mean?",
+                    "ask_dish": "Which item, restaurant or store do you mean?",
+                    "ask_item": "Which item should I show first? "
+                    "You can add several products to your cart.",
+                    "ask_pack": "Which pack size do you want? Select a product, "
+                    "then choose the number of packs. "
+                    "I will not assume kg or litres mean pack counts.",
                     "ask_allergens": "Select a dish to see merchant allergen information. "
                     "Missing data is not an allergy safety guarantee.",
                     "review_required": "Review your cart before confirming. "
@@ -565,7 +579,15 @@ class Shopping:
                     "unsupported": "I can use published menu facts, "
                     "but cannot invent prices or availability.",
                 }
-                return view(messages.get(plan.step, "Please tell me which dish you want."))
+                if plan.step == "ask_pack":
+                    state.pop("suggested_quantity", None)
+                    return view(
+                        messages["ask_pack"],
+                        cards=[item_card(r, d) for r, d in matches(self.catalog, plan.dish)]
+                        if plan.dish
+                        else None,
+                    )
+                return view(messages.get(plan.step, "Please tell me which item you want."))
             if plan.action == "explain":
                 messages = {
                     "explain_location": "GPS is used to check merchant delivery coverage. "
@@ -588,7 +610,11 @@ class Shopping:
                 explicit_dish = " ".join(
                     word for word in re.findall(r"[a-z]+", text.lower()) if word in dish_words
                 )
-                if explicit_dish and matches(self.catalog, direct_query):
+                if (
+                    explicit_dish
+                    and matches(self.catalog, direct_query)
+                    and not matches(self.catalog, plan.dish)
+                ):
                     # Ground unknown/new dish names in this merchant catalog, not training labels.
                     plan.dish = explicit_dish[:100]
                 state["brain_memory"] = {
@@ -678,6 +704,14 @@ class Shopping:
             rows = matches(self.catalog, search_query) if search_query else self.catalog.rows()
             if dietary:
                 rows = [(r, d) for r, d in rows if dietary in d.dietary]
+            quantity, budget = parsed.get("quantity"), parsed.get("budget")
+            if quantity and budget:
+                rows = [
+                    (r, d)
+                    for r, d in rows
+                    if d.kind == "food" or d.price_minor * quantity <= budget * 100
+                ]
+
             if state.get("suggesting"):
                 from itertools import combinations
 
@@ -722,9 +756,18 @@ class Shopping:
                 if parsed.get("quantity"):
                     state["suggested_quantity"] = parsed["quantity"]
                 if not neural.get("plan"):
+                    from backend.integrations.telegram.commerce_nlp_data import PRODUCTS
                     from backend.integrations.telegram.nlp_dataset import DISHES
 
-                    dish = next((d for d in DISHES if d in query.lower()), "")
+                    names = sorted([*DISHES, *PRODUCTS], key=len, reverse=True)
+                    dish = next(
+                        (
+                            d
+                            for d in names
+                            if re.search(r"(?<!\w)" + re.escape(d) + r"(?!\w)", query.lower())
+                        ),
+                        rows[0][1].name.lower().split(" · ")[0],
+                    )
                     old_memory = state.get("brain_memory", {})
                     budget_match = re.search(r"(?:under|below)\s*(\d+)", query)
                     remembered_budget = (
@@ -742,7 +785,7 @@ class Shopping:
                     }
                 return view(
                     ("DEMO · " if self.catalog.demo else "LIVE · ")
-                    + "Matching menu items. Select to customize and add to cart.",
+                    + "Matching products. Select a pack/item to customize and add to cart.",
                     cards=[item_card(r, d) for r, d in rows],
                 )
             if neural.get("plan"):

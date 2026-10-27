@@ -40,6 +40,9 @@ def interpret(text, neural=None):
     if intent:
         return {"action": ACTIONS.get(intent), "intent": intent, "query": raw}
     query = raw
+    from backend.integrations.telegram.commerce_nlp_data import normalize_product_names
+
+    query = normalize_product_names(query)
     for english, localized in DISHES.items():
         for term in localized:
             query = query.replace(term, english)
@@ -64,13 +67,6 @@ def interpret(text, neural=None):
     )
     if neural and neural.get("confidence", 0) >= 0.9:
         parts = neural.get("structured", "").split("|")
-        if (
-            len(parts) == 5
-            and parts[0] == "search"
-            and parts[1] in DISHES
-            and not any(dish in query for dish in DISHES)
-        ):
-            query += " " + parts[1]
         if len(parts) == 5 and parts[0] in ACTIONS and not intent and neural.get("neural_promoted"):
             # A neural suggestion may open a screen, never submit or pay an order.
             intent = parts[0]
@@ -92,7 +88,44 @@ def fuzzy_query(query, catalog):
         }
     )
     result = []
+    protected = {
+        "price",
+        "prices",
+        "quantity",
+        "budget",
+        "please",
+        "same",
+        "those",
+        "these",
+        "this",
+        "that",
+        "packs",
+        "packets",
+        "units",
+        "bottles",
+        "cheaper",
+        "cheapest",
+        "under",
+        "below",
+        "within",
+        "keep",
+        "change",
+        "instead",
+        "without",
+        "store",
+        "stores",
+        "show",
+        "find",
+        "need",
+        "want",
+        "only",
+        "from",
+        "with",
+    }
     for word in query.split():
+        if word in protected:
+            result.append(word)
+            continue
         candidates = difflib.get_close_matches(word, words, n=1, cutoff=0.76)
         result.append(candidates[0] if candidates and word not in words else word)
     return " ".join(result)
@@ -100,7 +133,7 @@ def fuzzy_query(query, catalog):
 
 TEXT = {
     "welcome": (
-        "What would you like today? Browse a restaurant or describe your meal.",
+        "What would you like today? Browse food, groceries or household essentials.",
         "ఈరోజు ఏమి తినాలనుకుంటున్నారు? రెస్టారెంట్ లేదా వంటకం ఎంచుకోండి.",
         "आज क्या खाना चाहेंगे? रेस्टोरेंट या खाना चुनें।",
     ),

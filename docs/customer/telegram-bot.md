@@ -160,3 +160,17 @@ Verification: focused bot/pricing tests and real PostgreSQL tests cover combined
 amounts, separate merchant orders, payment amount, fee changes and permissions.
 The delivery-accounting integration test isolates geographic serviceability;
 existing coverage-rejection integration tests run separately.
+
+## Grocery and essential conversation planning
+
+The corpus now includes 859 new grocery/essential utterances: rice, milk, produce,
+staples, detergents, cleaning products, personal care and household supplies.
+It covers follow-up edits using prior product/quantity/budget/sort state.
+The simulator includes clearly labeled sample products and multiple stores for
+comparison. Live Telegram uses only merchant-managed catalogs; sample stock,
+prices and artwork are never substituted for live product data.
+
+Natural requests generate typed plans before catalog lookup. Unknown or
+ambiguous requests may need clarification. Pack count and pack size are separate:
+`2 kg rice` asks the customer to select a pack; no silent weight-to-pack conversion
+is performed. Multiple items can be added separately to the existing cart.

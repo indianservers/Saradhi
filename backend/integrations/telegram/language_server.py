@@ -158,6 +158,8 @@ def health():
                 "new_v4_unique_commands",
                 "new_v5_training_commands",
                 "new_v5_unique_commands",
+                "new_v6_training_commands",
+                "new_v6_unique_commands",
                 "architecture",
                 "contextual_exact_match",
                 "trainable_parameters",
@@ -191,19 +193,14 @@ def understand(body: Query):
     )
 
     memory = body.context
-    prompt = (
-        f"Previous requested food: {memory.dish}. "
-        f'Customer says: "{body.text}". What food do they want? Return only the food name.'
-    )
+    structured, confidence = "", 0.0
     with lock:
-        inputs = tokenizer(prompt, return_tensors="tf", truncation=True, max_length=256)
-        output = model.generate(**inputs, max_new_tokens=32, do_sample=False)
-        query = tokenizer.decode(output[0], skip_special_tokens=True)
-        structured, confidence = trained.generate(body.text) if trained else ("", 0.0)
         brain_input = model_input(body.text, memory)
         raw, score = (
             brain.generate(brain_input) if brain and brain.accepts(brain_input) else ("", 0.0)
         )
+        if not raw and trained:
+            structured, confidence = trained.generate(body.text)
         if not raw and structured and confidence >= 0.9:
             fields = structured.split("|")
             if len(fields) == 5:
@@ -214,7 +211,7 @@ def understand(body: Query):
         plan = grounded_plan(parse_plan(raw, score, memory), body.text, memory)
     return {
         "ready": True,
-        "query": query[:150],
+        "query": plan.dish[:150] if plan and plan.action == "search" else "",
         "model": MODEL,
         "structured": structured,
         "confidence": confidence,

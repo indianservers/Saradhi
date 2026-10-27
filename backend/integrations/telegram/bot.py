@@ -396,9 +396,6 @@ class Store:
         if text:
             query = text
             # Explicit constraints always come from customer text, never model guesses.
-            hint = getattr(self, "query_hint", "")
-            if hint and not matches(catalog, text):
-                query = hint + " " + text
             if (
                 state.get("last_query")
                 and re.search(
@@ -421,7 +418,9 @@ class Store:
                     response["cards"] = response["cards"][:6]
                     response["next_page"] = "Page 6"
                 return response
-        return reply("Tell me a dish or restaurant, or browse the menu.", HOME)
+        return reply(
+            "Tell me an item, restaurant or store, or browse Food, Groceries and Essentials.", HOME
+        )
 
     @staticmethod
     def review(state):

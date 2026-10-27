@@ -106,6 +106,8 @@ if __name__ == "__main__":
         "new_v4_unique_commands": len({r["text"] for r in rows if r.get("new_v4")}),
         "new_v5_training_commands": len({r["text"] for r in train if r.get("new_v5")}),
         "new_v5_unique_commands": len({r["text"] for r in rows if r.get("new_v5")}),
+        "new_v6_training_commands": len({r["text"] for r in train if r.get("new_v6")}),
+        "new_v6_unique_commands": len({r["text"] for r in rows if r.get("new_v6")}),
         "prefix": PREFIX,
         "synthetic": True,
         "dataset_sha256": hashlib.sha256(

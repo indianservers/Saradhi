@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field, ValidationError
 from backend.integrations.telegram.brain_data import prompt
 
 Action = Literal[
+    "groceries",
+    "essentials",
+    "stores",
+    "browse_all",
     "search",
     "clarify",
     "explain",
@@ -48,6 +52,8 @@ class Plan(Memory):
         "show_matches",
         "open_screen",
         "ask_dish",
+        "ask_pack",
+        "ask_item",
         "ask_allergens",
         "explain_location",
         "explain_payment",
@@ -59,6 +65,8 @@ class Plan(Memory):
 
 
 def context_for(state, profile, catalog=None):
+    from backend.integrations.telegram.commerce_nlp_data import canonical_item_name
+
     try:
         memory = Memory.model_validate(state.get("brain_memory", {}))
     except ValidationError:
@@ -72,13 +80,13 @@ def context_for(state, profile, catalog=None):
                 (d for r, d in catalog.rows() if f"{r.id}/{d.id}" == draft["selection"]), None
             )
             if choice:
-                memory.dish = choice.name.lower().split(" · ")[0][:100]
+                memory.dish = canonical_item_name(choice.name)
     elif state.get("edit_line"):
         line = next(
             (line for line in profile.get("basket", []) if line["id"] == state["edit_line"]), None
         )
         if line:
-            memory.dish = line["item"].lower().split(" · ")[0][:100]
+            memory.dish = canonical_item_name(line["item"])
             memory.quantity = line["quantity"]
             memory.stage = "cart"
     elif state.get("screen"):
@@ -123,14 +131,28 @@ def grounded_plan(plan, text, memory):
     if plan is None or plan.confidence < 0.85:
         return None
     normalized = text.lower()
-    for word, value in (("two", "2"), ("three", "3"), ("four", "4"), ("రెండు", "2"), ("दो", "2")):
+    for word, value in (
+        ("one", "1"),
+        ("two", "2"),
+        ("three", "3"),
+        ("four", "4"),
+        ("five", "5"),
+        ("six", "6"),
+        ("seven", "7"),
+        ("eight", "8"),
+        ("nine", "9"),
+        ("ten", "10"),
+        ("రెండు", "2"),
+        ("दो", "2"),
+    ):
         normalized = re.sub(r"(?<!\w)" + word + r"(?!\w)", value, normalized)
     if plan.action == "search" and plan.dish and plan.dish != memory.dish:
         # A model may not invent a requested dish. Allow literal names, localized
         # names and close spelling matches, while requiring evidence in the message.
+        from backend.integrations.telegram.commerce_nlp_data import PRODUCT_ALIASES
         from backend.integrations.telegram.nlp_dataset import DISHES
 
-        aliases = (plan.dish, *DISHES.get(plan.dish, ()))
+        aliases = (plan.dish, *DISHES.get(plan.dish, ()), *PRODUCT_ALIASES.get(plan.dish, ()))
         words = re.findall(r"\w+", normalized)
         width = len(plan.dish.split())
         windows = [" ".join(words[i : i + width]) for i in range(len(words))]
@@ -139,11 +161,25 @@ def grounded_plan(plan, text, memory):
         )
         if not supported:
             return Plan(action="clarify", step="ask_dish", confidence=plan.confidence)
+    if plan.action == "search" and re.search(
+        r"\d+\s*(?:kg|kilograms?|litres?|liters?|ml|grams?|g)\b", normalized
+    ):
+        packs = re.search(r"(\d+)\s*(?:packs?|packets?|bags?|bottles?)\b", normalized)
+        if not packs or plan.quantity != int(packs[1]):
+            return Plan(
+                action="clarify", dish=plan.dish, step="ask_pack", confidence=plan.confidence
+            )
     numbers = set(re.findall(r"\d+", normalized))
     for key in ("quantity", "budget"):
         value = getattr(plan, key)
         old = getattr(memory, key)
-        if value is not None and value != old and str(value) not in numbers:
+        permitted = set(numbers)
+        if key == "quantity" and memory.quantity:
+            if re.search(r"\bdouble\b", normalized):
+                permitted.add(str(memory.quantity * 2))
+            if re.search(r"\bhalf\b", normalized) and memory.quantity % 2 == 0:
+                permitted.add(str(memory.quantity // 2))
+        if value is not None and value != old and str(value) not in permitted:
             return None
     if plan.action == "search" and not plan.dish:
         plan.action, plan.step = "clarify", "ask_dish"
@@ -181,6 +217,10 @@ def search_query(plan):
 def route_plan(plan):
     """Only discovery/screens can be automatic. Every write retains explicit UI confirmation."""
     return {
+        "groceries": "Groceries",
+        "essentials": "Essentials",
+        "stores": "Stores",
+        "browse_all": "All items",
         "restaurants": "Restaurants",
         "cart": "Cart",
         "favorites": "Favorites",

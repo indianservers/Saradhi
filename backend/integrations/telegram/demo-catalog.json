@@ -115,12 +115,331 @@
           "kind": "groceries",
           "unit": "1 litre",
           "vegetarian": true
+        },
+        {
+          "id": "basmati_rice",
+          "name": "Basmati rice 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 12000,
+          "vegetarian": true
+        },
+        {
+          "id": "eggs",
+          "name": "Eggs 6 eggs",
+          "kind": "groceries",
+          "unit": "6 eggs",
+          "price_minor": 4800,
+          "vegetarian": false
+        },
+        {
+          "id": "onions",
+          "name": "Onions 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 3500,
+          "vegetarian": true
+        },
+        {
+          "id": "potatoes",
+          "name": "Potatoes 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 3800,
+          "vegetarian": true
+        },
+        {
+          "id": "atta",
+          "name": "Atta 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 7000,
+          "vegetarian": true
+        },
+        {
+          "id": "sugar",
+          "name": "Sugar 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 4500,
+          "vegetarian": true
+        },
+        {
+          "id": "cooking_oil",
+          "name": "Cooking oil 1 litre",
+          "kind": "groceries",
+          "unit": "1 litre",
+          "price_minor": 14000,
+          "vegetarian": true
+        },
+        {
+          "id": "tea",
+          "name": "Tea 250 g",
+          "kind": "groceries",
+          "unit": "250 g",
+          "price_minor": 11000,
+          "vegetarian": true
+        },
+        {
+          "id": "coffee",
+          "name": "Coffee 200 g",
+          "kind": "groceries",
+          "unit": "200 g",
+          "price_minor": 15000,
+          "vegetarian": true
+        },
+        {
+          "id": "dal",
+          "name": "Dal 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 13000,
+          "vegetarian": true
+        },
+        {
+          "id": "apples",
+          "name": "Apples 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 16000,
+          "vegetarian": true
+        },
+        {
+          "id": "bananas",
+          "name": "Bananas 6 bananas",
+          "kind": "groceries",
+          "unit": "6 bananas",
+          "price_minor": 4500,
+          "vegetarian": true
+        },
+        {
+          "id": "oats",
+          "name": "Oats 500 g",
+          "kind": "groceries",
+          "unit": "500 g",
+          "price_minor": 9000,
+          "vegetarian": true
         }
       ],
       "demo_delivery_fee_minor": 4500,
       "demo_eta_minutes": [
         45,
         60
+      ]
+    },
+    {
+      "id": "demo_value",
+      "name": "Demo Value Market",
+      "city": "Sample city",
+      "kind": "groceries",
+      "menu": [
+        {
+          "id": "rice",
+          "name": "Rice 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 6200,
+          "vegetarian": true
+        },
+        {
+          "id": "milk",
+          "name": "Milk 1 litre",
+          "kind": "groceries",
+          "unit": "1 litre",
+          "price_minor": 5700,
+          "vegetarian": true
+        },
+        {
+          "id": "atta",
+          "name": "Atta 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 6700,
+          "vegetarian": true
+        },
+        {
+          "id": "sugar",
+          "name": "Sugar 1 kg",
+          "kind": "groceries",
+          "unit": "1 kg",
+          "price_minor": 4200,
+          "vegetarian": true
+        },
+        {
+          "id": "cooking_oil",
+          "name": "Cooking oil 1 litre",
+          "kind": "groceries",
+          "unit": "1 litre",
+          "price_minor": 13700,
+          "vegetarian": true
+        }
+      ],
+      "demo_delivery_fee_minor": 3500,
+      "demo_eta_minutes": [
+        35,
+        55
+      ]
+    },
+    {
+      "id": "demo_home",
+      "name": "Demo Home Care",
+      "city": "Sample city",
+      "kind": "essentials",
+      "menu": [
+        {
+          "id": "detergent",
+          "name": "Detergent 1 kg",
+          "kind": "essentials",
+          "unit": "1 kg",
+          "price_minor": 14900,
+          "vegetarian": false
+        },
+        {
+          "id": "dishwashing_liquid",
+          "name": "Dishwashing liquid 500 ml",
+          "kind": "essentials",
+          "unit": "500 ml",
+          "price_minor": 9500,
+          "vegetarian": false
+        },
+        {
+          "id": "floor_cleaner",
+          "name": "Floor cleaner 1 litre",
+          "kind": "essentials",
+          "unit": "1 litre",
+          "price_minor": 11000,
+          "vegetarian": false
+        },
+        {
+          "id": "hand_wash",
+          "name": "Hand wash 250 ml",
+          "kind": "essentials",
+          "unit": "250 ml",
+          "price_minor": 7500,
+          "vegetarian": false
+        },
+        {
+          "id": "toothpaste",
+          "name": "Toothpaste 100 g",
+          "kind": "essentials",
+          "unit": "100 g",
+          "price_minor": 8500,
+          "vegetarian": false
+        },
+        {
+          "id": "shampoo",
+          "name": "Shampoo 180 ml",
+          "kind": "essentials",
+          "unit": "180 ml",
+          "price_minor": 15900,
+          "vegetarian": false
+        },
+        {
+          "id": "bath_soap",
+          "name": "Bath soap 125 g",
+          "kind": "essentials",
+          "unit": "125 g",
+          "price_minor": 4000,
+          "vegetarian": false
+        },
+        {
+          "id": "toilet_paper",
+          "name": "Toilet paper 4 rolls",
+          "kind": "essentials",
+          "unit": "4 rolls",
+          "price_minor": 12000,
+          "vegetarian": false
+        },
+        {
+          "id": "tissues",
+          "name": "Tissues 100 sheets",
+          "kind": "essentials",
+          "unit": "100 sheets",
+          "price_minor": 5500,
+          "vegetarian": false
+        },
+        {
+          "id": "garbage_bags",
+          "name": "Garbage bags 30 bags",
+          "kind": "essentials",
+          "unit": "30 bags",
+          "price_minor": 9000,
+          "vegetarian": false
+        },
+        {
+          "id": "batteries",
+          "name": "Batteries 4 batteries",
+          "kind": "essentials",
+          "unit": "4 batteries",
+          "price_minor": 8000,
+          "vegetarian": false
+        },
+        {
+          "id": "notebooks",
+          "name": "Notebooks 1 notebook",
+          "kind": "essentials",
+          "unit": "1 notebook",
+          "price_minor": 4500,
+          "vegetarian": false
+        }
+      ],
+      "demo_delivery_fee_minor": 3500,
+      "demo_eta_minutes": [
+        35,
+        55
+      ]
+    },
+    {
+      "id": "demo_daily",
+      "name": "Demo Daily Needs",
+      "city": "Sample city",
+      "kind": "essentials",
+      "menu": [
+        {
+          "id": "detergent",
+          "name": "Detergent 1 kg",
+          "kind": "essentials",
+          "unit": "1 kg",
+          "price_minor": 14400,
+          "vegetarian": false
+        },
+        {
+          "id": "toothpaste",
+          "name": "Toothpaste 100 g",
+          "kind": "essentials",
+          "unit": "100 g",
+          "price_minor": 8000,
+          "vegetarian": false
+        },
+        {
+          "id": "shampoo",
+          "name": "Shampoo 180 ml",
+          "kind": "essentials",
+          "unit": "180 ml",
+          "price_minor": 15400,
+          "vegetarian": false
+        },
+        {
+          "id": "bath_soap",
+          "name": "Bath soap 125 g",
+          "kind": "essentials",
+          "unit": "125 g",
+          "price_minor": 3500,
+          "vegetarian": false
+        },
+        {
+          "id": "garbage_bags",
+          "name": "Garbage bags 30 bags",
+          "kind": "essentials",
+          "unit": "30 bags",
+          "price_minor": 8500,
+          "vegetarian": false
+        }
+      ],
+      "demo_delivery_fee_minor": 3500,
+      "demo_eta_minutes": [
+        35,
+        55
       ]
     }
   ]

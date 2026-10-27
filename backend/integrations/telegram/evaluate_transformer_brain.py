@@ -21,8 +21,10 @@ if __name__ == "__main__":
     rows = [json.loads(line) for line in OUTPUT.read_text(encoding="utf-8").splitlines()]
     test = [r for r in rows if r["split"] != "train"]
     results = []
-    for start in range(0, len(test), 8):
-        batch = test[start : start + 8]
+    batch_size = int(os.environ.get("QUICKBUDDY_EVAL_BATCH", "8"))
+    assert 1 <= batch_size <= 32
+    for start in range(0, len(test), batch_size):
+        batch = test[start : start + batch_size]
         predictions = model.batch([r["input"] for r in batch])
         for row, (raw, score) in zip(batch, predictions, strict=True):
             results.append(
@@ -39,14 +41,18 @@ if __name__ == "__main__":
         if start % 80 == 0:
             print(json.dumps({"evaluated": len(results), "of": len(test)}), flush=True)
     contextual = [r for r in results if r["context"]]
-    previous = [r for r in results if not r["family"].startswith(("v2_", "v3_", "v4_", "v5_"))]
-    expanded = [r for r in results if r["family"].startswith(("v2_", "v3_", "v4_", "v5_"))]
-    previous_v2 = [r for r in results if not r["family"].startswith(("v3_", "v4_", "v5_"))]
-    newest = [r for r in results if r["family"].startswith(("v3_", "v4_", "v5_"))]
-    previous_v3 = [r for r in results if not r["family"].startswith(("v4_", "v5_"))]
+    previous = [
+        r for r in results if not r["family"].startswith(("v2_", "v3_", "v4_", "v5_", "v6_"))
+    ]
+    expanded = [r for r in results if r["family"].startswith(("v2_", "v3_", "v4_", "v5_", "v6_"))]
+    previous_v2 = [r for r in results if not r["family"].startswith(("v3_", "v4_", "v5_", "v6_"))]
+    newest = [r for r in results if r["family"].startswith(("v3_", "v4_", "v5_", "v6_"))]
+    previous_v3 = [r for r in results if not r["family"].startswith(("v4_", "v5_", "v6_"))]
     current_v4 = [r for r in results if r["family"].startswith("v4_")]
-    previous_v4 = [r for r in results if not r["family"].startswith("v5_")]
+    previous_v4 = [r for r in results if not r["family"].startswith(("v5_", "v6_"))]
     current_v5 = [r for r in results if r["family"].startswith("v5_")]
+    previous_v5 = [r for r in results if not r["family"].startswith("v6_")]
+    commerce_cases = [r for r in results if r["family"].startswith("v6_")]
     metadata = model.metadata
     metadata["model_sha256"] = hashlib.sha256((folder / "tf_model.h5").read_bytes()).hexdigest()
     metadata["commands"] = len(rows)
@@ -75,6 +81,11 @@ if __name__ == "__main__":
         "v5_development_exact": sum(r["correct"] for r in current_v5) / len(current_v5)
         if current_v5
         else None,
+        "previous_v5_development_exact": sum(r["correct"] for r in previous_v5) / len(previous_v5),
+        "commerce_development_exact": sum(r["correct"] for r in commerce_cases)
+        / len(commerce_cases)
+        if commerce_cases
+        else None,
         "results": results,
     }
     (folder / "evaluation.json").write_text(
@@ -89,6 +100,12 @@ if __name__ == "__main__":
     fresh = evaluate(model, fresh_cases)
     (folder / "audit-v2.json").write_text(
         json.dumps(fresh, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    from backend.integrations.telegram.audit_commerce_nlp import CASES as commerce_audit
+
+    commerce_report = evaluate(model, commerce_audit)
+    (folder / "commerce-audit.json").write_text(
+        json.dumps(commerce_report, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     (folder / "deployment.json").write_text(
         json.dumps(
@@ -105,6 +122,9 @@ if __name__ == "__main__":
         json.dumps(
             {
                 "development_exact": report["exact_match"],
+                "commerce_development_exact": report["commerce_development_exact"],
+                "commerce_audit_exact": commerce_report["exact_match"],
+                "previous_v5_development_exact": report["previous_v5_development_exact"],
                 "previous_v2_development_exact": report["previous_v2_development_exact"],
                 "newest_development_exact": report["newest_development_exact"],
                 "previous_development_exact": report["previous_development_exact"],
